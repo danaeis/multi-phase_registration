@@ -1,0 +1,2215 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Registration Failure Diagnosis Report</title>
+<style>
+  body { font-family: monospace; font-size: 13px; margin: 20px; background: #f5f5f5; }
+  h1   { font-size: 20px; }
+  h2   { font-size: 15px; margin-top: 30px; color: #333; border-bottom: 1px solid #ccc; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+  th { background: #333; color: #fff; padding: 6px 8px; text-align: left; }
+  td { padding: 5px 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
+  .ok      { background: #d4edda; }
+  .bad     { background: #f8d7da; }
+  .missing { background: #fff3cd; }
+  .flag-red    { background: #dc3545; color: white; border-radius: 4px; padding: 2px 5px; margin: 1px; display: inline-block; }
+  .flag-orange { background: #fd7e14; color: white; border-radius: 4px; padding: 2px 5px; margin: 1px; display: inline-block; }
+  .flag-yellow { background: #ffc107; color: black; border-radius: 4px; padding: 2px 5px; margin: 1px; display: inline-block; }
+  .flag-gray   { background: #6c757d; color: white; border-radius: 4px; padding: 2px 5px; margin: 1px; display: inline-block; }
+  .tooltip-wrap { position: relative; display: inline-block; cursor: help; }
+  .tooltip-wrap .tooltip-text {
+    visibility: hidden; width: 350px; background: #222; color: #fff;
+    padding: 8px; border-radius: 6px; position: absolute; z-index: 1;
+    bottom: 120%; left: 0; font-size: 11px; line-height: 1.5;
+  }
+  .tooltip-wrap:hover .tooltip-text { visibility: visible; }
+  .summary-bar { display: flex; gap: 20px; margin-bottom: 20px; }
+  .summary-box { border: 1px solid #ccc; border-radius: 8px; padding: 10px 20px;
+                 background: white; text-align: center; }
+  .summary-box .num { font-size: 28px; font-weight: bold; }
+  .summary-box .lbl { font-size: 12px; color: #666; }
+</style>
+</head>
+<body>
+<h1>Registration Failure Diagnosis Report</h1>
+
+
+<div class="summary-bar">
+  <div class="summary-box"><div class="num">106</div><div class="lbl">Total series</div></div>
+  <div class="summary-box" style="border-color:#28a745"><div class="num" style="color:#28a745">48</div><div class="lbl">OK</div></div>
+  <div class="summary-box" style="border-color:#dc3545"><div class="num" style="color:#dc3545">55</div><div class="lbl">BAD (52%)</div></div>
+  <div class="summary-box" style="border-color:#ffc107"><div class="num" style="color:#888">3</div><div class="lbl">File missing</div></div>
+</div>
+
+<h2>Flag Frequency</h2><table><tr><th>Flag</th><th>Count</th><th>Meaning</th></tr>
+<tr><td><span class='flag-orange'>LARGE_CENTROID_DIST</span></td><td>55</td><td>One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates res…</td></tr>
+<tr><td><span class='flag-yellow'>LARGE_XY_RESIDUAL</span></td><td>13</td><td>Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset …</td></tr>
+</table>
+<h2>Per-Study Details</h2>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1432695579.168588</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-2.2</td>
+      <td>52.8</td>
+      <td>52.7</td>
+      <td><span class="tooltip-wrap"><span class="flag-yellow">LARGE_XY_RESIDUAL=52.8mm</span><span class="tooltip-text">Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset remains and may cause Nelder-Mead (Pass 1) to converge to a local minimum.</span></span> <span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=53.7mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=54.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=53.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=51.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=50.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=50.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=53.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=56.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=51.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=52.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=53.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=51.6mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+1.9</td>
+      <td>20.4</td>
+      <td>23.2</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=21.5mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=20.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=21.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=19.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=18.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=20.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=35.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=31.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=21.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=21.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=22.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=24.4mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1497923284.55315</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-0.1</td>
+      <td>60.0</td>
+      <td>60.0</td>
+      <td><span class="tooltip-wrap"><span class="flag-yellow">LARGE_XY_RESIDUAL=60.0mm</span><span class="tooltip-text">Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset remains and may cause Nelder-Mead (Pass 1) to converge to a local minimum.</span></span> <span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=61.1mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=59.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=59.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=59.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=58.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=60.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=60.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=61.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=59.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=59.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=59.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=60.0mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-0.1</td>
+      <td>55.5</td>
+      <td>55.8</td>
+      <td><span class="tooltip-wrap"><span class="flag-yellow">LARGE_XY_RESIDUAL=55.5mm</span><span class="tooltip-text">Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset remains and may cause Nelder-Mead (Pass 1) to converge to a local minimum.</span></span> <span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=56.2mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=54.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=55.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=56.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=53.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=55.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=56.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=57.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=56.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=55.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=55.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=56.1mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1522984884.757455</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.9</td>
+      <td>7.1</td>
+      <td>8.2</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: IVC=18.1mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+1.5</td>
+      <td>2.7</td>
+      <td>3.6</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1523338564.321791</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-0.6</td>
+      <td>10.7</td>
+      <td>10.2</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+4.9</td>
+      <td>98.9</td>
+      <td>99.1</td>
+      <td><span class="tooltip-wrap"><span class="flag-yellow">LARGE_XY_RESIDUAL=98.9mm</span><span class="tooltip-text">Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset remains and may cause Nelder-Mead (Pass 1) to converge to a local minimum.</span></span> <span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=97.1mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=97.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=100.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=101.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=97.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=98.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=95.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=100.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=99.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=100.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=101.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=99.3mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1526972837.526920</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-6.7</td>
+      <td>38.6</td>
+      <td>40.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=37.9mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=39.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=39.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=40.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=46.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=40.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=43.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=41.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=38.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=38.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=39.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=39.2mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+3.1</td>
+      <td>26.5</td>
+      <td>25.0</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=25.7mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=30.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=23.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=26.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=26.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=26.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=31.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=26.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=25.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=24.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=25.1mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1528603299.120286</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-5.0</td>
+      <td>2.0</td>
+      <td>5.7</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: spleen=18.2mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=23.7mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>11.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+0.5</td>
+      <td>2.1</td>
+      <td>8.1</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: aorta=20.4mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=23.5mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1530156734.608221</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-3.7</td>
+      <td>17.3</td>
+      <td>18.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=18.0mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=17.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=18.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=16.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=20.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=21.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=17.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=17.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=18.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=18.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=18.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=17.5mm</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-2.2</td>
+      <td>5.6</td>
+      <td>5.6</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="missing">
+      <td>Arterial</td>
+      <td><b>file_missing</b></td>
+      <td>nan / nan</td>
+      <td>nan / nan ✓</td>
+      <td>+nan</td>
+      <td>nan</td>
+      <td>nan</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1533522625.630037</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-9.0</td>
+      <td>2.5</td>
+      <td>7.8</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-14.6</td>
+      <td>9.5</td>
+      <td>12.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=19.9mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=23.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=16.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=22.3mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1542254308.519780</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.9</td>
+      <td>5.0</td>
+      <td>7.1</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+4.4</td>
+      <td>19.1</td>
+      <td>18.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=17.7mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=19.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=19.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=22.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=18.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=19.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=17.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=20.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=19.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=16.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=16.3mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1573179664.62772</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+0.8</td>
+      <td>24.5</td>
+      <td>24.1</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=25.1mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=25.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=24.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=23.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=22.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=24.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=24.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=25.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=23.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=23.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=23.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=23.8mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-0.2</td>
+      <td>20.0</td>
+      <td>19.7</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=19.9mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=20.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=20.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=19.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=20.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=18.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=19.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=19.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=19.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=19.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=19.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=20.0mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1573181976.738010</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>11.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+0.0</td>
+      <td>13.7</td>
+      <td>14.8</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: pancreas=15.2mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=16.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=19.0mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>11.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+0.6</td>
+      <td>21.3</td>
+      <td>22.7</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=20.2mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=22.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=21.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=20.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=22.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=23.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=22.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=19.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=35.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=20.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=21.3mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1573442981.375377</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>10.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+0.3</td>
+      <td>189.4</td>
+      <td>184.6</td>
+      <td><span class="tooltip-wrap"><span class="flag-yellow">LARGE_XY_RESIDUAL=189.4mm</span><span class="tooltip-text">Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset remains and may cause Nelder-Mead (Pass 1) to converge to a local minimum.</span></span> <span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=187.4mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=191.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=166.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=191.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=183.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=190.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=184.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=181.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=177.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=191.1mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>10.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+1.1</td>
+      <td>192.4</td>
+      <td>188.0</td>
+      <td><span class="tooltip-wrap"><span class="flag-yellow">LARGE_XY_RESIDUAL=192.4mm</span><span class="tooltip-text">Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset remains and may cause Nelder-Mead (Pass 1) to converge to a local minimum.</span></span> <span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=190.2mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=194.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=170.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=196.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=185.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=196.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=186.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=183.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=179.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=197.9mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1573604712.598232</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-0.5</td>
+      <td>32.8</td>
+      <td>32.5</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=32.7mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=32.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=32.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=32.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=30.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=31.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=34.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=32.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=32.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=32.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=32.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=32.7mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+0.2</td>
+      <td>41.2</td>
+      <td>40.6</td>
+      <td><span class="tooltip-wrap"><span class="flag-yellow">LARGE_XY_RESIDUAL=41.2mm</span><span class="tooltip-text">Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset remains and may cause Nelder-Mead (Pass 1) to converge to a local minimum.</span></span> <span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=40.2mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=42.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=41.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=41.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=39.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=38.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=40.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=40.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=41.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=40.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=41.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=41.3mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1573609663.550134</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+6.7</td>
+      <td>92.1</td>
+      <td>90.2</td>
+      <td><span class="tooltip-wrap"><span class="flag-yellow">LARGE_XY_RESIDUAL=92.1mm</span><span class="tooltip-text">Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset remains and may cause Nelder-Mead (Pass 1) to converge to a local minimum.</span></span> <span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=95.1mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=92.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=93.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=87.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=92.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=97.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=86.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=89.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=85.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=86.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=87.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=86.9mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+1.5</td>
+      <td>14.5</td>
+      <td>14.1</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: spleen=16.5mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=15.1mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1573613878.909734</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-2.0</td>
+      <td>9.6</td>
+      <td>10.5</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.7</td>
+      <td>12.1</td>
+      <td>12.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1573700569.639395</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-0.9</td>
+      <td>5.6</td>
+      <td>6.3</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+0.7</td>
+      <td>21.1</td>
+      <td>21.2</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=20.8mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=21.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=21.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=20.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=20.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=22.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=21.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=22.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=20.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=21.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=21.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=20.8mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1574308298.505216</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+4.1</td>
+      <td>34.7</td>
+      <td>32.0</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=33.7mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=44.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=33.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=30.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=34.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=40.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=25.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=34.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=26.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=27.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=27.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=27.1mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.4</td>
+      <td>39.2</td>
+      <td>38.0</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=38.1mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=39.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=38.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=41.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=37.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=37.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=37.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=35.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=37.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=38.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=37.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=37.9mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1574651082.95426</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+6.6</td>
+      <td>68.3</td>
+      <td>67.9</td>
+      <td><span class="tooltip-wrap"><span class="flag-yellow">LARGE_XY_RESIDUAL=68.3mm</span><span class="tooltip-text">Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset remains and may cause Nelder-Mead (Pass 1) to converge to a local minimum.</span></span> <span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=68.8mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=70.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=68.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=66.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=68.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=68.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=66.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=68.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=67.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=67.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=67.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=67.0mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+1.4</td>
+      <td>24.1</td>
+      <td>24.9</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=24.5mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=24.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=24.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=23.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=24.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=25.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=25.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=25.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=26.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=25.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=25.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=24.9mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1574652927.757399</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+3.9</td>
+      <td>16.5</td>
+      <td>16.0</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=16.9mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=17.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=16.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=16.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=15.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=16.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=17.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=15.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=15.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=15.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=15.2mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+2.4</td>
+      <td>15.8</td>
+      <td>16.5</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=16.4mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=16.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=15.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=16.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=16.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=15.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=19.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=18.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=16.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=16.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=16.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=16.2mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1574734831.134817</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-3.1</td>
+      <td>45.2</td>
+      <td>44.6</td>
+      <td><span class="tooltip-wrap"><span class="flag-yellow">LARGE_XY_RESIDUAL=45.2mm</span><span class="tooltip-text">Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset remains and may cause Nelder-Mead (Pass 1) to converge to a local minimum.</span></span> <span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=45.5mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=44.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=46.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=44.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=44.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=40.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=45.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=46.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=44.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=44.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=44.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=44.3mm</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.6</td>
+      <td>8.0</td>
+      <td>8.9</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.392.200036.9116.2.5.1.37.2418751871.1574736893.449879</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-0.7</td>
+      <td>27.3</td>
+      <td>28.5</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=29.0mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=26.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=27.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=26.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=29.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=28.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=28.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=36.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=27.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=27.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=27.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=27.4mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-6.7</td>
+      <td>52.5</td>
+      <td>52.9</td>
+      <td><span class="tooltip-wrap"><span class="flag-yellow">LARGE_XY_RESIDUAL=52.5mm</span><span class="tooltip-text">Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset remains and may cause Nelder-Mead (Pass 1) to converge to a local minimum.</span></span> <span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=50.2mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=51.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=54.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=55.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=57.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=52.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=49.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=63.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=50.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=50.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=50.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=50.1mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.166.1580339212.908</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-3.7</td>
+      <td>5.9</td>
+      <td>8.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: IVC=28.7mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-3.0</td>
+      <td>7.7</td>
+      <td>9.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: IVC=16.4mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.166.1580339213.591</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>11.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-2.4</td>
+      <td>1.4</td>
+      <td>2.6</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.166.1580339218.937</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-3.1</td>
+      <td>3.6</td>
+      <td>5.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-9.4</td>
+      <td>20.8</td>
+      <td>24.3</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=22.5mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=21.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=24.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=23.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=22.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=24.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=26.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=24.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=25.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=24.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=25.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=26.2mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.166.1580339223.519</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+0.6</td>
+      <td>2.4</td>
+      <td>3.1</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+1.5</td>
+      <td>0.8</td>
+      <td>1.9</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.166.1580339223.956</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-2.7</td>
+      <td>5.8</td>
+      <td>8.2</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: IVC=17.8mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+5.2</td>
+      <td>4.9</td>
+      <td>9.2</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: IVC=19.2mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.166.1580339224.657</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.5</td>
+      <td>3.1</td>
+      <td>4.1</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.1</td>
+      <td>2.8</td>
+      <td>3.7</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.166.1580339230.481</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+1.0</td>
+      <td>2.6</td>
+      <td>2.9</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+0.6</td>
+      <td>2.2</td>
+      <td>2.8</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.202.1592287869.821</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.3</td>
+      <td>2.6</td>
+      <td>3.3</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.9</td>
+      <td>1.8</td>
+      <td>3.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.202.1592287871.359</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-2.6</td>
+      <td>2.4</td>
+      <td>4.6</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.0</td>
+      <td>5.0</td>
+      <td>5.8</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: IVC=19.9mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.202.1592287875.688</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-3.1</td>
+      <td>3.3</td>
+      <td>4.5</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+0.5</td>
+      <td>2.2</td>
+      <td>3.8</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.202.1592287876.601</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-2.0</td>
+      <td>4.6</td>
+      <td>5.7</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-5.9</td>
+      <td>4.6</td>
+      <td>8.2</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: IVC=15.8mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.202.1592287879.955</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+5.1</td>
+      <td>5.6</td>
+      <td>9.7</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: aorta=35.8mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+6.4</td>
+      <td>10.0</td>
+      <td>14.1</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: aorta=37.6mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=17.3mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.202.1592287881.707</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>11.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+3.0</td>
+      <td>4.6</td>
+      <td>6.3</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>11.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+4.0</td>
+      <td>2.6</td>
+      <td>5.2</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.204.1584947859.517</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+1.7</td>
+      <td>1.5</td>
+      <td>2.6</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+2.4</td>
+      <td>2.5</td>
+      <td>4.1</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.204.1584947875.688</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.6</td>
+      <td>3.4</td>
+      <td>4.7</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+2.0</td>
+      <td>0.9</td>
+      <td>2.1</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.204.1584947878.721</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>9.0 / 3.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-5.7</td>
+      <td>42.1</td>
+      <td>43.1</td>
+      <td><span class="tooltip-wrap"><span class="flag-yellow">LARGE_XY_RESIDUAL=42.1mm</span><span class="tooltip-text">Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset remains and may cause Nelder-Mead (Pass 1) to converge to a local minimum.</span></span> <span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=42.0mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=43.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=43.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=43.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=44.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=46.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=42.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=42.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=39.7mm</span></span> </td>
+    </tr>
+
+
+    <tr class="missing">
+      <td>Venous</td>
+      <td><b>file_missing</b></td>
+      <td>nan / nan</td>
+      <td>nan / nan ✓</td>
+      <td>+nan</td>
+      <td>nan</td>
+      <td>nan</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>9.0 / 3.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-21.8</td>
+      <td>85.8</td>
+      <td>91.5</td>
+      <td><span class="tooltip-wrap"><span class="flag-yellow">LARGE_XY_RESIDUAL=85.8mm</span><span class="tooltip-text">Anchor-organ XY centroid residual >40 mm after alignment. Z-alignment corrects only the Z axis. A large in-plane offset remains and may cause Nelder-Mead (Pass 1) to converge to a local minimum.</span></span> <span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=78.7mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=98.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=90.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=74.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=98.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=101.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=101.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=94.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=86.7mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.204.1584947881.751</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-2.1</td>
+      <td>1.8</td>
+      <td>2.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-4.1</td>
+      <td>15.5</td>
+      <td>17.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=15.3mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=17.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=17.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=17.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=18.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=18.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=17.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=18.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=18.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=17.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=17.9mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##fff3cd; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.204.1584947883.344</b>  —  file_missing
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.6</td>
+      <td>2.5</td>
+      <td>3.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+0.4</td>
+      <td>1.7</td>
+      <td>2.7</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="missing">
+      <td>Venous</td>
+      <td><b>file_missing</b></td>
+      <td>nan / nan</td>
+      <td>nan / nan ✓</td>
+      <td>+nan</td>
+      <td>nan</td>
+      <td>nan</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.204.1584947888.428</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-4.2</td>
+      <td>19.2</td>
+      <td>20.2</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=21.5mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=20.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=18.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=19.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=19.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=17.9mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=21.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=21.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=22.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=21.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=19.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=20.2mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-3.3</td>
+      <td>17.6</td>
+      <td>18.6</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=20.1mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=18.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=16.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=17.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=17.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=16.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=20.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=20.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=20.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=19.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=17.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=19.0mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.204.1584947890.185</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+3.1</td>
+      <td>2.0</td>
+      <td>4.9</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: aorta=16.2mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+1.4</td>
+      <td>3.1</td>
+      <td>4.3</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.215.1582589428.278</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-2.3</td>
+      <td>2.1</td>
+      <td>3.6</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-3.9</td>
+      <td>4.5</td>
+      <td>7.5</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.228.1585527915.93</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-3.0</td>
+      <td>3.1</td>
+      <td>4.8</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-2.3</td>
+      <td>4.6</td>
+      <td>5.3</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.228.1585527919.20</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.2</td>
+      <td>10.9</td>
+      <td>11.3</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.9</td>
+      <td>8.6</td>
+      <td>9.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.228.1585527923.702</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>11.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+3.9</td>
+      <td>3.5</td>
+      <td>5.8</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>11.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+4.9</td>
+      <td>6.4</td>
+      <td>11.4</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: aorta=37.1mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=16.8mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.228.1585527924.199</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+1.2</td>
+      <td>9.2</td>
+      <td>9.2</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>+4.6</td>
+      <td>2.0</td>
+      <td>4.9</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.239.1576237085.40</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-3.6</td>
+      <td>4.0</td>
+      <td>5.6</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.9</td>
+      <td>5.2</td>
+      <td>7.8</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.239.1576237164.135</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-3.6</td>
+      <td>6.5</td>
+      <td>8.5</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.5</td>
+      <td>10.4</td>
+      <td>11.3</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: IVC=16.0mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.239.1576237169.526</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-0.6</td>
+      <td>3.1</td>
+      <td>5.3</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: aorta=18.9mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-2.4</td>
+      <td>5.5</td>
+      <td>7.6</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: aorta=24.2mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.239.1576237177.531</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-7.3</td>
+      <td>26.2</td>
+      <td>27.7</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=28.8mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=27.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=25.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=26.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=22.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=27.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=31.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=28.0mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=30.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=28.7mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=27.4mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=27.4mm</span></span> </td>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Venous</td>
+      <td><b>BAD</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-7.4</td>
+      <td>24.3</td>
+      <td>25.6</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: liver=26.5mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> <span class="tooltip-wrap"><span class="flag-gray">spleen=25.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_L=24.1mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">kidney_R=25.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">pancreas=19.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">gallbladder=24.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">aorta=29.3mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">IVC=26.2mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L1=28.5mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L2=26.8mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">L3=25.6mm</span></span> <span class="tooltip-wrap"><span class="flag-gray">spinal_cord=25.3mm</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##f8d7da; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.239.1576237179.120</b>  —  BAD
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="bad">
+      <td>Arterial</td>
+      <td><b>BAD</b></td>
+      <td>11.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-0.2</td>
+      <td>12.8</td>
+      <td>13.8</td>
+      <td><span class="tooltip-wrap"><span class="flag-orange">LARGE_CENTROID_DIST: L1=15.2mm</span><span class="tooltip-text">One or more organs have >15 mm 3D centroid distance between NC and moving phase after this pipeline stage. Indicates residual misalignment.</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>11.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-1.0</td>
+      <td>9.8</td>
+      <td>10.5</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<details>
+  <summary style="cursor:pointer; padding:6px; background:##d4edda; border-radius:4px; margin:4px 0;">
+    <b>1.2.840.113619.2.278.3.717616.249.1585713639.107</b>  —  OK
+  </summary>
+  <table>
+    <tr>
+      <th>Phase</th><th>Status</th>
+      <th>Common organs<br>(Kabsch / bone)</th>
+      <th>det NC / MOV</th>
+      <th>Z-offset (mm)</th>
+      <th>XY residual (mm)</th>
+      <th>Mean centroid<br>3D (mm)</th>
+      <th>Flags</th>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Arterial</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-0.1</td>
+      <td>7.2</td>
+      <td>7.8</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+
+    <tr class="ok">
+      <td>Venous</td>
+      <td><b>OK</b></td>
+      <td>12.0 / 4.0</td>
+      <td>1.000 / 1.000 ✓</td>
+      <td>-0.3</td>
+      <td>6.3</td>
+      <td>5.7</td>
+      <td><span class="tooltip-wrap"><span class="flag-gray">nan</span></span> </td>
+    </tr>
+
+</table></details>
+
+<hr>
+<p style="color:#888; font-size:11px;">
+Generated by visualize_diagnosis.py &nbsp;|&nbsp;
+Flag colors: 🔴 red = likely root cause of catastrophic failure &nbsp;
+🟠 orange = warning &nbsp; 🟡 yellow = performance risk<br>
+Hover over a flag for its explanation.
+</p>
+</body></html>

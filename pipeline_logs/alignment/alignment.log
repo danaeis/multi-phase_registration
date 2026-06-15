@@ -1,0 +1,13 @@
+2026-06-13T19:21:45 [WARNING ] pipeline.alignment.1.2.840.113619.2.359.3.2831208971.102.1580775830.218 — [Arterial] Low confidence (0.00) — no offset applied. Check seg_reg organ count for series 1.2.840.113619.2.359.3.2831208971.746.15.
+2026-06-13T19:22:01 [WARNING ] pipeline.alignment.1.2.840.113619.2.359.3.2831208971.125.1572221105.250 — [Arterial] Low confidence (0.00) — no offset applied. Check seg_reg organ count for series 1.2.840.113619.2.359.3.2831208971.125.15.
+2026-06-13T19:23:08 [WARNING ] pipeline.alignment.1.2.840.113619.2.359.3.2831208971.27.1589930824.148 — [Arterial] Low confidence (0.00) — no offset applied. Check seg_reg organ count for series 1.2.840.113619.2.359.3.2831208971.682.15.
+2026-06-13T19:23:31 [WARNING ] pipeline.alignment.1.2.840.113619.2.359.3.2831208971.47.1588634888.707 — [Arterial] Low confidence (0.00) — no offset applied. Check seg_reg organ count for series 1.2.840.113619.2.359.3.2831208971.47.158.
+2026-06-13T19:23:33 [WARNING ] pipeline.alignment.1.2.840.113619.2.359.3.2831208971.47.1588634888.707 — [Other] Low confidence (0.00) — no offset applied. Check seg_reg organ count for series 1.2.840.113619.2.359.3.2831208971.47.158.
+2026-06-13T19:23:38 [WARNING ] pipeline.alignment.1.2.840.113619.2.359.3.2831208971.49.1557878721.790 — [Arterial] Low confidence (0.00) — no offset applied. Check seg_reg organ count for series 1.2.840.113619.2.359.3.2831208971.679.15.
+2026-06-13T19:23:38 [ERROR   ] pipeline.alignment.1.2.840.113619.2.359.3.2831208971.49.1557878721.790 — Alignment failed: No physical Z overlap across series: sup=-24.0mm, inf=-13.5mm
+Traceback (most recent call last):
+  File "/media/external20/saeedeh_danaei/sample_data_reg/data_reg_pipeline/alignment/align_and_crop.py", line 222, in run_study
+    result = align_study(
+  File "/media/external20/saeedeh_danaei/sample_data_reg/data_reg_pipeline/alignment/align_data_v3.py", line 655, in align_study
+    raise ValueError(
+ValueError: No physical Z overlap across series: sup=-24.0mm, inf=-13.5mm
