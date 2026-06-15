@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+venv/
+.env
+
+# Build outputs
+dist/
+build/
+*.min.js
+*.bundle.js
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Misc
+.env.local
+.env.production
+*.pem
+
+
+__pycache__
+*/__pycache__
+*/*/__pycache__
+
+
+pipeline_logs/*
