@@ -50,9 +50,15 @@ ALIGNED_CROP_DIR   = MAIN / "aligned_volumes"                  # A2: + z-align
 RIGID_ALIGNED_DIR  = MAIN / "fixed_aligned_rigid_registered"   # A3/A4/A5
 RESULTS_DIR        = MAIN / "experiments" / "results"          # A6 + all baselines
 
+
+RIGID_BASELINE_DIR = MAIN / "fixed_baseline_rigid_registered"
+
+
 LABELS_CSV = MAIN / "labels.csv"
 REF_PHASE  = "Non-contrast"
 EROSION_MM = 6.0
+
+
 
 
 @dataclass(frozen=True)
@@ -92,14 +98,19 @@ CONDITIONS: Dict[str, Condition] = {c.tag: c for c in [
     _C("A5_pass012",    RIGID_ALIGNED_DIR,  "_rigid2.nii.gz",        "_rigid2_seg_reg.nii.gz"),
     _C("A6_bspline",    RESULTS_DIR / "A6_bspline", "_bspline.nii.gz",
         "_bspline_seg_reg.nii.gz", deformable=True, dvf="_bspline_dvf.nii.gz"),
-    _C("B1_elastix",    RESULTS_DIR / "B1_elastix", "_elastix.nii.gz",
-        "_elastix_seg_reg.nii.gz"),
-    _C("B2_deeds",      RESULTS_DIR / "B2_deeds",   "_deeds.nii.gz",
-        "_deeds_seg_reg.nii.gz",   deformable=True, dvf="_deeds_dvf.nii.gz"),
-    _C("B3_ants",       RESULTS_DIR / "B3_ants",    "_ants.nii.gz",
-        "_ants_seg_reg.nii.gz",    deformable=True, dvf="_ants_dvf.nii.gz"),
-    _C("B4_vxm",        RESULTS_DIR / "B4_vxm",     "_vxm.nii.gz",
-        "_vxm_seg_reg.nii.gz",     deformable=True, dvf="_vxm_dvf.nii.gz"),
+    # _C("B1_elastix",    RESULTS_DIR / "B1_elastix", "_elastix.nii.gz",
+    #     "_elastix_seg_reg.nii.gz"),
+    # _C("B2_deeds",      RESULTS_DIR / "B2_deeds",   "_deeds.nii.gz",
+    #     "_deeds_seg_reg.nii.gz",   deformable=True, dvf="_deeds_dvf.nii.gz"),
+    # _C("B3_ants",       RESULTS_DIR / "B3_ants",    "_ants.nii.gz",
+    #     "_ants_seg_reg.nii.gz",    deformable=True, dvf="_ants_dvf.nii.gz"),
+    # _C("B4_vxm",        RESULTS_DIR / "B4_vxm",     "_vxm.nii.gz",
+    #     "_vxm_seg_reg.nii.gz",     deformable=True, dvf="_vxm_dvf.nii.gz"),
+
+    _C("A3b_pass0_noalign",  RIGID_BASELINE_DIR, "_rigid0.nii.gz", "_rigid0_seg_reg.nii.gz"),
+    _C("A4b_pass01_noalign", RIGID_BASELINE_DIR, "_rigid1.nii.gz", "_rigid1_seg_reg.nii.gz"),
+    _C("A5b_pass012_noalign",    RIGID_BASELINE_DIR,  "_rigid2.nii.gz", "_rigid2_seg_reg.nii.gz"),
+
 ]}
 
 
