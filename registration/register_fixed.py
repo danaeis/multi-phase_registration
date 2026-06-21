@@ -575,7 +575,7 @@ def make_euler3d(R, t, center):
     tx.SetComputeZYX(True)
     tx.SetCenter(center.tolist())
     tx.SetRotation(rx, ry, rz)
-    t_total = t_inv - (R_inv - np.eye(3)) @ center
+    t_total = t_inv + (R_inv - np.eye(3)) @ center
     tx.SetTranslation(t_total.tolist())
     return tx
 
@@ -1014,7 +1014,7 @@ def register_study(
                 mov_seg_reg_pass1 = _apply_seg(mov_seg_reg, nc_img, tx0)
                 err1 = err0_centroid
                 
-            # ── Pass 2 — gradient-magnitude edge polish ────────────────────
+            # # ── Pass 2 — gradient-magnitude edge polish ────────────────────
             print(f"\n  Pass 2 — gradient-edge polish (phase-invariant)...")
 
             # FIX 10: moving mask = fixed mask resampled into moving space + 10mm dilation
