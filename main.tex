@@ -1,0 +1,1081 @@
+\documentclass[10pt,twocolumn]{article}
+
+% ── Packages ──────────────────────────────────────────────────────────────
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{cite}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{balance}
+
+% ── Placeholder helpers (remove before submission) ─────────────────────────
+\newcommand{\TODO}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\newcommand{\REF}{\textcolor{blue}{[REF]}}
+\newcommand{\NUM}[1]{\textcolor{teal}{[#1]}}
+\newcommand{\BLANK}{\textcolor{orange}{\textbf{---}}}   % result not yet available
+
+% ── Mask shorthand (used throughout) ──────────────────────────────────────
+\newcommand{\Mfull}{\mathcal{M}_{\text{full}}}
+\newcommand{\Mreg}{\mathcal{M}_{\text{reg}}}
+\newcommand{\Mbone}{\mathcal{M}_{\text{bone}}}
+\newcommand{\Mdice}{\mathcal{M}_{\text{Dice}}}
+
+% ── Title ──────────────────────────────────────────────────────────────────
+\title{%
+  Organ-Guided Multi-Phase Abdominal CT Registration\\
+  via Anatomy-Constrained Mattes Mutual Information
+}
+
+\author{%
+  \TODO{Author 1}\textsuperscript{1} \quad
+  \TODO{Author 2}\textsuperscript{1} \quad
+  \TODO{Author 3}\textsuperscript{1,2}\\[4pt]
+  \textsuperscript{1}\TODO{Institution}\\
+  \textsuperscript{2}\TODO{Institution (if applicable)}\\[4pt]
+  \texttt{\TODO{corresponding@email.edu}}
+}
+
+\date{}
+
+% ══════════════════════════════════════════════════════════════════════════
+\begin{document}
+\maketitle
+
+% ── Abstract ──────────────────────────────────────────────────────────────
+\begin{abstract}
+Accurate spatial alignment of multi-phase abdominal computed tomography
+(CT) — non-contrast (NC), arterial, and venous acquisitions — is
+essential for joint analysis of vascular enhancement, lesion
+characterisation, and organ segmentation transfer.
+The task is complicated by inter-session patient repositioning, variable
+axial coverage, and the fundamental invalidity of intensity-based
+similarity metrics across contrast-induced Hounsfield Unit (HU)
+distributions.
+We propose a fully automated, anatomy-constrained pipeline comprising
+five ordered stages: (i)~preprocessing with DICOM-convention-aware
+HU normalisation; (ii)~TotalSegmentator-based organ segmentation merged
+into a custom four-tier label volume; (iii)~confidence-gated 3D centroid
+Z-alignment; (iv)~a three-pass rigid registration scheme that initialises
+from a Kabsch SVD on bone-only labels, refines via Nelder-Mead
+optimisation of a combined centroid-distance and eroded-Dice loss, and
+polishes with a Sobel-gradient NCC stage gated by a centroid-displacement
+acceptance criterion; and (v)~B-spline deformable refinement.
+Throughout, the Mattes Mutual Information (MMI) similarity objective is
+evaluated exclusively within $\Mreg$, a mask of contrast-stable organs
+from which bowel, contrast-enhancing structures, and peristaltic tissue
+are explicitly excluded.
+Applied to the VinDr multi-phase CT dataset
+(\NUM{265} studies, \NUM{795} volumes, two scanner families), the
+pipeline is evaluated via eroded Dice coefficient and centroid
+displacement across eleven abdominal structures grouped into parenchymal,
+vascular, and skeletal categories.
+\TODO{Headline result: e.g., ``The proposed method achieves a median
+eroded Dice of \BLANK\,$\pm$\,\BLANK across all organ groups, reducing
+centroid displacement by \BLANK\,\% relative to the strongest classical
+baseline, while requiring \BLANK$\times$ less wall-clock time than ANTs
+SyN.''}
+\end{abstract}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Introduction}
+\label{sec:intro}
+
+Multi-phase abdominal CT is a cornerstone of hepatic oncology,
+vascular surgery planning, and solid organ evaluation~\cite{forner2018}.
+Each protocol comprises three acquisitions — non-contrast (NC),
+arterial, and venous phases — that capture complementary tissue
+properties: NC provides baseline parenchymal density, arterial phase
+reveals vascular enhancement, and venous phase characterises portal
+and parenchymal perfusion~\cite{easl2018}.
+Joint exploitation of all three phases, whether for lesion
+characterisation, longitudinal change detection, or segmentation
+propagation, requires all volumes to be in accurate spatial
+correspondence.
+
+Achieving this correspondence is non-trivial.
+First, patients are repositioned between acquisitions, introducing
+rigid-body translations that include axial shifts up to
+\NUM{80}\,mm from variable breath-hold depth and table position.
+Second, contrast administration non-linearly alters the HU distribution
+of vascular and parenchymal structures: the aortic lumen shifts from
+$\sim$30\,HU in NC to $\sim$350\,HU in arterial phase, while liver
+parenchyma enhances by 20--80\,HU in venous phase~\REF.
+These shifts violate the local intensity-consistency assumptions of
+standard similarity metrics such as normalised cross-correlation (NCC)
+and mean squared error (MSE)~\cite{pluim2003}.
+Third, bowel and hollow viscera undergo peristaltic motion and gas
+redistribution between acquisitions, introducing non-rigid deformations
+that corrupt any metric evaluated over the full field of view.
+Prior work has addressed rigid inter-session alignment~\REF\ and
+deformable abdominal registration~\cite{metz2011,klein2010}\ in
+isolation, yet few methods simultaneously address all three
+challenges in a single, principled pipeline.
+
+The key gap in existing methods is the application of whole-image
+similarity objectives in a setting where those objectives are
+theoretically invalid.
+Classical toolboxes such as elastix~\cite{klein2010} and ANTs~\cite{avants2008}
+default to full-volume NCC or MSE, metrics whose validity depends on
+a linear (NCC) or identity (MSE) relationship between corresponding
+voxel intensities — a relationship broken wherever contrast enhancement
+occurs.
+Segmentation-driven approaches~\cite{xu2019,hu2018} use label overlap
+as the objective, side-stepping intensity invalidity but coupling
+registration accuracy directly to segmentation quality.
+A principled formulation is missing: one that retains the statistical
+power of intensity-based similarity but evaluates it only where
+the underlying metric assumptions hold.
+
+This paper makes the following contributions:
+%
+\begin{enumerate}
+
+  \item \textbf{Anatomy-constrained MMI.}
+  We propose restricting the Mattes Mutual Information objective to
+  $\Mreg$, a TotalSegmentator-derived, automatically merged mask of
+  contrast-stable organs, from which bowel, padding, and
+  contrast-enhancing structures are explicitly excluded.
+  The principled exclusion is motivated by the statistical invalidity
+  of intensity similarity across contrast-induced HU shifts
+  (\S\ref{sec:seg}; ablated in \S\ref{sec:metric_ablation}).
+
+  \item \textbf{Bone-anchored Kabsch SVD initialisation.}
+  Prior to intensity optimisation, we align phases via a closed-form
+  Kabsch SVD~\cite{kabsch1976} computed on $\Mbone$, the bone-only
+  sub-mask.
+  Because bony anatomy is both phase-invariant and rigid, this
+  initialisation provides a geometrically sound starting point that
+  is independent of contrast-induced centroid shifts in soft tissue
+  (\S\ref{sec:rigid}).
+
+  \item \textbf{Confidence-gated 3D centroid Z-alignment.}
+  We introduce a weighted-centroid Z-offset estimation stage with a
+  MAD-filtered confidence score that gates fallback to a centre-of-mass
+  crop when segmentation coverage is insufficient
+  (\S\ref{sec:zalign}).
+
+  \item \textbf{Organ-grouped evaluation protocol.}
+  We report eroded Dice and centroid displacement per organ, grouped
+  into parenchymal, vascular, and skeletal categories across
+  \NUM{265} studies and two contrast phases, providing a reproducible
+  benchmark for future methods on the VinDr dataset
+  (\S\ref{sec:eval}).
+
+  \item \textbf{Systematic comparison and ablation.}
+  We evaluate the full pipeline against \TODO{ANTs SyN, elastix
+  B-spline, and VoxelMorph} under identical evaluation conditions,
+  and include an ablation over similarity metric (MMI vs.\ NCC
+  vs.\ MSE, masked vs.\ whole-image) and pipeline stage contribution
+  (\S\ref{sec:results}).
+
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Classical Multi-Phase CT Registration}
+\label{sec:related_classical}
+
+Intensity-based deformable registration was established by Thirion's
+Demons algorithm~\cite{thirion1998} and the free-form B-spline model
+of Rueckert~et~al.~\cite{rueckert1999}.
+The elastix toolkit~\cite{klein2010} and ANTs~\cite{avants2008}
+generalised these frameworks to a broad family of similarity metrics
+and transform models, becoming de facto baselines for abdominal CT
+registration.
+Mutual information (MI)~\cite{wells1996} and its Parzen-window
+estimator~\cite{mattes2001} extended registration to multi-modal
+settings by modelling the joint intensity histogram rather than
+assuming linear correspondence; the statistical conditions under which
+MI remains a valid registration objective are surveyed in~\cite{pluim2003}.
+
+For multi-phase abdominal CT specifically, Metz et~al.~\cite{metz2011}
+demonstrated B-spline registration with temporal groupwise optimisation
+but applied the similarity metric over the full image domain.
+Heinrich~et~al.~\cite{heinrich2013} introduced DEEDS, a discrete
+deformable registration method that optimises over a dense displacement
+field via efficient message passing, achieving strong performance
+on abdominal and multi-modal data without explicit intensity assumptions.
+The Learn2Reg benchmark~\cite{hering2022} provides a standardised
+comparison framework for abdominal registration methods; we adopt
+a compatible evaluation protocol in \S\ref{sec:eval}.
+
+The limitation common to these classical methods is the application
+of whole-image similarity objectives in the multi-phase setting, where
+contrast enhancement locally violates the intensity assumptions that
+justify those objectives.
+
+\subsection{Learning-Based Abdominal Registration}
+\label{sec:related_dl}
+
+VoxelMorph~\cite{balakrishnan2019} established the amortised
+learning-based registration paradigm, training a convolutional network
+to predict deformation fields directly from image pairs.
+TransMorph~\cite{chen2022} and LapIRN~\cite{mok2020} subsequently
+demonstrated strong performance on large-deformation and multi-scale
+registration.
+HyperMorph~\cite{hoopes2021} further showed that registration
+hyperparameters — including the weighting between similarity and
+regularisation objectives — can themselves be learned, but decisions
+about \emph{which regions} contribute to the similarity term remain
+left to the practitioner.
+
+A key challenge for learning-based methods in the multi-phase CT
+setting is the absence of within-phase training data: most public
+benchmarks provide intra-modality pairs, and cross-phase pairs require
+either manual annotation or a registration method to generate
+pseudo-ground-truth.
+UniGradICON~\cite{tian2023} represents a step toward task-agnostic
+generalisation, but its domain shift across contrast phases has
+not been characterised.
+The evaluation protocol introduced in \S\ref{sec:eval} is directly
+applicable to these methods as future baselines.
+
+\subsection{Anatomy-Constrained and Masked Registration}
+\label{sec:related_masked}
+
+The use of anatomical information to guide registration spans several
+paradigms.
+Segmentation-driven methods~\cite{xu2019,hu2018} replace the intensity
+objective with a label-based loss, fully decoupling registration from
+intensity validity but binding accuracy to segmentation quality.
+Anatomy-constrained neural networks~\cite{oktay2017} incorporate
+anatomical shape priors into the training objective, improving
+plausibility of deformations near organ boundaries.
+
+An alternative approach uses image features that are, by design,
+modality-independent.
+Heinrich~et~al.~\cite{heinrich2012} proposed MIND descriptors that
+capture local self-similarity structure, making the registration
+feature representation robust to cross-modal intensity shifts.
+In the multi-phase CT context, this motivates gradient-domain
+similarity (used in our Pass~2; \S\ref{sec:rigid}), since HU gradients
+at organ boundaries are structurally similar across phases even when
+absolute intensities differ.
+
+Region-of-interest masking within elastix and ITK-based
+pipelines~\cite{klein2010} allows the fixed-image metric domain
+to be restricted to a spatial mask, but existing applications
+use this feature as a spatial convenience (e.g., excluding background)
+rather than as a principled exclusion of contrast-invalid tissue.
+Sliding-motion regularisation~\cite{papiez2014} uses anatomical
+boundaries to adapt the regulariser but evaluates similarity globally.
+De~Vos~et~al.~\cite{devos2019} incorporate anatomy-aware weighting
+in a learning-based framework, but the weighting is learned from
+within-modality data and does not address cross-phase invalidity.
+
+The novelty of the present work is the \emph{principled exclusion}
+of contrast-sensitive and peristaltic structures from an
+intensity-based objective, motivated by the statistical invalidity
+of NCC and MSE across contrast-induced HU distributions.
+To our knowledge, no prior work has formalised this exclusion criterion
+for multi-phase abdominal CT registration, nor provided an ablation
+demonstrating its impact relative to whole-image and label-based
+alternatives.
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Dataset}
+\label{sec:dataset}
+
+We evaluate on the VinDr multi-phase abdominal CT dataset~\cite{vindr},
+comprising \textbf{\NUM{265} studies} (\NUM{795} volumes) acquired across
+two scanner families identified by DICOM UID prefixes
+\texttt{1.2.840} and \texttt{1.2.392}.
+Each study contains three contrast phases: \textbf{non-contrast (NC)},
+\textbf{arterial}, and \textbf{venous}.
+The NC phase serves as the fixed reference in all experiments; arterial
+and venous phases are registered independently.
+
+Scanner heterogeneity manifests in differing DICOM encoding conventions:
+\texttt{1.2.840} series require the standard RescaleSlope/Intercept
+GDCM decoding (which SimpleITK applies automatically), while
+\texttt{1.2.392} series store pixels already in Hounsfield Units.
+Both conventions are handled identically by the preprocessing stage
+(\S\ref{sec:preproc}), which clips all volumes to
+$[-1024,\,+1024]$\,HU after resampling.
+
+\TODO{%
+  Report: (1)~mean\,$\pm$\,SD slice counts per phase,
+  (2)~distribution of axial offsets between NC and moving phases
+  measured at the Z-alignment stage,
+  (3)~number of studies successfully processed end-to-end,
+  (4)~exclusion criteria and count of excluded studies.
+}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Method}
+\label{sec:method}
+
+An overview of the pipeline is shown in Fig.~\ref{fig:pipeline}.
+
+\begin{figure}[t]
+  \centering
+  \TODO{Pipeline diagram: DICOM $\to$ NIfTI $\to$ TotalSeg $\to$
+  Mask Merge $\to$ Crop $\to$ Z-align $\to$ Rigid (P0/P1/P2)
+  $\to$ Deformable $\to$ Evaluate.
+  Each box should show the output postfix and the mask it consumes.
+  Distinguish $\Mreg$ (MMI domain) from $\Mdice$ (Nelder-Mead Dice
+  domain) from $\Mbone$ (Kabsch SVD domain).}
+  \caption{Overview of the proposed multi-phase CT registration pipeline.
+  The NC phase is the fixed reference throughout. Four mask tiers derived
+  from a single TotalSegmentator pass serve distinct roles at each stage.}
+  \label{fig:pipeline}
+\end{figure}
+
+% ── 4.1 ───────────────────────────────────────────────────────────────────
+\subsection{Preprocessing and Standardisation}
+\label{sec:preproc}
+
+Each DICOM series is read via SimpleITK's \texttt{ImageSeriesReader}
+(GDCM backend) and processed as follows:
+%
+\begin{enumerate}
+  \item \textbf{Orientation.}
+  Volumes are reoriented to LPS convention, establishing a canonical
+  axis ordering across scanner families.
+
+  \item \textbf{Resampling.}
+  Trilinear interpolation resamples to isotropic 1.5\,mm spacing.
+  Boundary voxels are filled with $-1024$\,HU (standard CT air),
+  not the scanner minimum, to prevent outside-FOV sentinel values
+  (commonly $-4048$\,HU or $-3024$\,HU) from contaminating the
+  mutual information histogram.
+
+  \item \textbf{HU clipping.}
+  Values are clipped to $[-1024,\,+1024]$\,HU, removing sentinel
+  artefacts while retaining the full diagnostic range of abdominal
+  soft tissue ($\leq\!700$\,HU for cortical bone).
+  This step is applied \emph{before} saving and before TotalSegmentator
+  inference.
+\end{enumerate}
+
+% ── 4.2 ───────────────────────────────────────────────────────────────────
+\subsection{Organ Segmentation and Four-Tier Mask Construction}
+\label{sec:seg}
+
+TotalSegmentator v\TODO{X.X}~\cite{wasserthal2023} is applied to each
+preprocessed volume, producing per-structure binary NIfTI files.
+These are merged into a single multi-label volume using a fixed
+project-defined integer mapping that assigns each structure a
+deterministic label independent of TotalSegmentator's internal
+indexing.
+The mapping defines four tiers:
+
+\medskip
+\noindent\textbf{Tier~1 — Bone} (labels 21--99): spinal cord, lumbar
+and lower thoracic vertebrae (L1--L5, T10--T12), sacrum, S1, hip
+bones, femora, sternum, costal cartilages, and all 24 ribs.
+These structures are rigid, phase-invariant, and provide the most
+reliable geometric anchors for registration initialisation.
+
+\noindent\textbf{Tier~2 — Stable soft tissue} (labels 1--19): liver,
+spleen, bilateral kidneys, pancreas, gallbladder, paraspinal muscles
+(autochthon bilaterally), iliopsoas bilaterally, aorta, inferior vena
+cava (IVC), portal and splenic vein, and bilateral iliac arteries and
+veins.
+These structures maintain predictable spatial positions across contrast
+phases, making their centroids and intensities (within a known HU
+range) suitable for metric evaluation.
+
+\noindent\textbf{Tier~3 — Variable soft tissue} (labels 100+): stomach,
+oesophagus, urinary bladder, adrenal glands, prostate, and gluteal
+muscles.
+These are included in the bounding-box mask only; they are explicitly
+excluded from the registration metric domain due to contrast-sensitive
+HU variation or unpredictable positional change between acquisitions.
+
+\noindent\textbf{Tier~0 — Excluded entirely}: colon, small bowel,
+duodenum, and rectum.
+Peristaltic motion and gas redistribution between acquisitions introduce
+non-rigid deformations that are incompatible with any rigid or B-spline
+model; their inclusion in the metric domain introduces conflicting
+gradient signals.
+
+\medskip
+\noindent Four composite masks are derived from this label volume:
+
+\begin{itemize}
+  \item $\Mfull$: union of Tiers~1--3. Used solely to compute the
+  abdominal bounding box for volume cropping; never used as a
+  registration metric domain.
+
+  \item $\Mreg$: union of Tiers~1--2 (all stable organs). Used as
+  the spatial domain for MMI evaluation in all registration stages,
+  and as the anchor set for Z-alignment centroid estimation.
+
+  \item $\Mbone$: Tier~1 subset comprising spinal cord, vertebrae
+  L1--L5, T10--T12, sacrum, S1, sternum, and upper ribs (left and
+  right ribs~1--3). Used exclusively in the Pass~0 Kabsch SVD
+  initialisation (\S\ref{sec:rigid}).
+
+  \item $\Mdice$: curated Tier~1+2 subset comprising liver, spleen,
+  bilateral kidneys, spinal cord, vertebrae L1--L5, aorta, and IVC.
+  Structures with contrast-variant HU behaviour (iliac vessels) or
+  high peristaltic mobility (stomach, esophagus) are excluded.
+  Used exclusively in the Pass~1 Nelder-Mead Dice loss
+  (\S\ref{sec:rigid}).
+\end{itemize}
+
+% ── 4.3 ───────────────────────────────────────────────────────────────────
+\subsection{Confidence-Gated Z-Alignment}
+\label{sec:zalign}
+
+Inter-session axial offsets are resolved prior to intensity-based
+registration by weighted centroid matching of anchor organs between
+phases.
+
+\paragraph{Centroid offset estimation.}
+For anchor organ $k \in \{\text{liver, spleen, kidney}_L, \text{kidney}_R\}$
+(labels 1--4 in $\Mreg$), the physical-space Z-centroid $c_k^{(Z)}$
+is computed independently for NC and the moving phase.
+The weighted Z-offset estimate is:
+%
+\begin{equation}
+  \Delta Z \;=\;
+  \frac{\displaystyle\sum_{k \in \mathcal{K}} w_k\,
+        \bigl(c_k^{\text{NC},(Z)} - c_k^{\text{mov},(Z)}\bigr)}
+       {\displaystyle\sum_{k \in \mathcal{K}} w_k}
+  \label{eq:zoffset}
+\end{equation}
+%
+where $\mathcal{K}$ is the set of anchor organs with voxel count
+$\geq\!200$ in both phases, $w_\text{liver}=3.0$, and
+$w_{\text{spleen}} = w_{\text{kidney}_L} = w_{\text{kidney}_R} = 2.0$.
+Individual organ offsets deviating by more than $1.5\times$ the median
+absolute deviation (MAD) from the median are treated as outliers and
+excluded.
+
+\paragraph{Confidence score and gating.}
+A confidence score $\gamma = {\sum_{k\in\mathcal{K}} w_k} \,/\,
+{\sum_k w_k^{\max}}$ reflects the fraction of anchor weight
+that contributed to the estimate.
+If $\gamma < 0.40$ or $|\Delta Z| > 80$\,mm, the study falls back to
+a per-series organ centre-of-mass crop.
+$\gamma$, $\Delta Z$, and the method applied are logged per study.
+
+% ── 4.4 ───────────────────────────────────────────────────────────────────
+\subsection{Three-Pass Organ-Masked Rigid Registration}
+\label{sec:rigid}
+
+Rigid registration comprises three sequential passes, each building on
+the previous.
+
+\paragraph{Pass~0: Kabsch SVD bone initialisation.}
+Given the set of voxel coordinates $\{p_i\}$ from $\Mbone$ in the
+fixed (NC) phase and $\{q_i\}$ from the corresponding labels in the
+moving phase, we solve for the optimal rotation $R$ and translation
+$t$ via the Kabsch algorithm~\cite{kabsch1976}:
+%
+\begin{equation}
+  (R^*, t^*) = \operatorname*{arg\,min}_{R \in SO(3),\, t}
+  \sum_{i} w_i \,\bigl\| R\,q_i + t - p_i \bigr\|^2
+  \label{eq:kabsch}
+\end{equation}
+%
+where $w_i$ is the per-label weight from $\Mbone$.
+The closed-form solution factorises the weighted covariance matrix via
+SVD.
+Bone labels are chosen for this stage because they are rigid,
+phase-invariant, and their centroids are unaffected by contrast
+pooling — properties that do not hold for soft-tissue organ centroids
+in multi-phase CT.
+The result $T_0 = (R^*, t^*)$ is used to initialise Pass~1.
+
+\paragraph{Pass~1: Nelder-Mead centroid + eroded-Dice refinement.}
+Starting from $T_0$, a derivative-free Nelder-Mead
+minimiser~\cite{nelder1965} optimises a combined loss over $\Mdice$:
+%
+\begin{equation}
+  \mathcal{L}(T) = \lambda \cdot d_c(T) \;+\;
+  \bigl(1 - \text{Dice}_\epsilon(T)\bigr)
+  \label{eq:pass1loss}
+\end{equation}
+%
+where $d_c$ is the volume-weighted centroid displacement
+(Eq.~\ref{eq:centroid}), $\text{Dice}_\epsilon$ is the eroded Dice
+coefficient (Eq.~\ref{eq:dice}) averaged over $\Mdice$ labels,
+and $\lambda = 10.0$ balances the two terms.
+Nelder-Mead is chosen over gradient-based optimisers because the
+eroded-Dice term is computed on discretised binary masks and is
+therefore non-differentiable.
+The erosion radius per organ is set proportionally to organ size
+(2.0--6.0\,mm), preventing small structures with noisy boundaries
+from dominating the loss.
+The result $T_1$ is used to initialise Pass~2.
+
+\paragraph{Pass~2: Sobel-gradient NCC polish with acceptance gate.}
+Pass~2 applies a phase-invariant intensity polish using SimpleITK's
+\texttt{ImageRegistrationMethod} with a Sobel-gradient NCC objective:
+the similarity metric is computed on the gradient-magnitude images
+$|\nabla I_\text{fixed}|$ and $|\nabla I_\text{moving}|$ rather than
+raw HU values.
+HU gradients at organ boundaries are structurally similar across
+contrast phases even when absolute intensities differ, providing a
+phase-invariant intensity signal.
+Multi-resolution proceeds at shrink factors $[3, 2, 1]$ with Gaussian
+smoothing $[1.5, 0.5, 0.0]$\,mm, initialised from $T_1$.
+The result $T_2$ is accepted only when centroid displacement under
+$T_2$ is lower than under $T_1$; otherwise $T_1$ is retained.
+This acceptance gate prevents the polish stage from corrupting
+well-converged rigid alignments.
+
+Segmentation masks are propagated to registered space via
+nearest-neighbour resampling; volumes are resampled with Lanczos
+windowed sinc interpolation.
+
+% ── 4.5 ───────────────────────────────────────────────────────────────────
+\subsection{B-Spline Deformable Registration}
+\label{sec:deformable}
+
+Deformable refinement uses a free-form B-spline
+transform~\cite{rueckert1999} at 25\,mm control-point grid spacing,
+applied after the rigid stage.
+The similarity metric is MMI within $\Mreg$ (fixed mask only; no
+moving mask is applied, as simultaneous masking introduces conflicting
+constraints before masks are aligned).
+Optimisation uses L-BFGS-B with multi-resolution $[4, 2, 1]$ and
+\NUM{X} histogram bins and \NUM{Y}\% spatial sampling.
+
+\TODO{If grid-spacing ablation (15/25/40\,mm) was run, add one sentence
+referencing \S\ref{sec:ablation}; otherwise remove.}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Evaluation Protocol}
+\label{sec:eval}
+
+\subsection{Metrics}
+
+All metrics are computed between the NC fixed phase and each registered
+moving phase (arterial, venous), summarised as median\,$\pm$\,IQR.
+Median and IQR are used throughout as they are robust to the subset
+of studies where segmentation fails for one phase.
+
+\textbf{Eroded Dice coefficient.}
+Both fixed and moving organ masks are independently eroded by
+$r = 6$\,mm in physical space prior to Dice computation:
+%
+\begin{equation}
+  \text{Dice}_\epsilon(A,B) =
+  \frac{2\,|A_\epsilon \cap B_\epsilon|}{|A_\epsilon| + |B_\epsilon|}
+  \label{eq:dice}
+\end{equation}
+%
+Erosion removes the boundary voxels where TotalSegmentator uncertainty
+concentrates, ensuring the metric reflects volumetric alignment quality
+rather than delineation accuracy.
+Organ pairs in which either eroded mask contains fewer than 500 voxels
+are excluded from that study's statistics.
+
+\textbf{Centroid displacement (mm).}
+Euclidean distance between physical-space centroids of the full
+(non-eroded) organ masks:
+%
+\begin{equation}
+  d_c = \bigl\|\bar{\mathbf{x}}^{(A)} - \bar{\mathbf{x}}^{(B)}\bigr\|_2
+  \label{eq:centroid}
+\end{equation}
+%
+where $\bar{\mathbf{x}}^{(\cdot)}$ is the voxel-count-weighted centroid
+in mm.
+This metric is insensitive to boundary noise and sensitive to gross
+misalignment, making it complementary to eroded Dice.
+
+\textbf{NCC exclusion.}
+Normalised cross-correlation assumes a linear relationship between
+corresponding voxel intensities, which is violated across contrast
+phases~\cite{pluim2003}.
+NCC values are noise rather than signal before intensity normalisation
+and are excluded from all reported results.
+
+\subsection{Organ Groups}
+
+The eleven evaluated structures are grouped as follows:
+
+\begin{center}
+\small
+\begin{tabular}{ll}
+\toprule
+\textbf{Group} & \textbf{Structures} \\
+\midrule
+Parenchymal & Liver, Spleen, Kidney (L/R), Pancreas, Gallbladder \\
+Vascular    & Aorta, IVC \\
+Skeletal    & Vertebra L1, L2, L3 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Vertebral bodies are included as contrast-independent internal
+sanity references: correct rigid registration should yield near-perfect
+skeletal alignment independent of the similarity metric choice.
+
+\subsection{Evaluated Conditions}
+
+\textbf{Pipeline ablation} (same framework, varying stages):
+
+\begin{center}
+\small
+\begin{tabular}{ll}
+\toprule
+\textbf{Stage} & \textbf{Description} \\
+\midrule
+Baseline   & Organ CoM crop, no registration \\
+Z-Aligned  & Z-centroid alignment only \\
+Rigid      & Z-align + three-pass rigid \\
+Deformable & Z-align + rigid + B-spline \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Metric ablation} (deformable stage, fixed organ mask):
+MMI (proposed) vs.\ NCC vs.\ MSE, each evaluated whole-image and
+within $\Mreg$. All other hyperparameters held fixed.
+
+\textbf{Method comparison} (deformable stage):
+\TODO{ANTs SyN~\cite{avants2008}, elastix B-spline~\cite{klein2010},
+DEEDS~\cite{heinrich2013}, VoxelMorph~\cite{balakrishnan2019}}.
+Wall-clock time per study (GPU/CPU) reported alongside accuracy.
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Experiments and Results}
+\label{sec:results}
+
+\subsection{Implementation Details}
+\label{sec:impl}
+
+The pipeline is implemented in Python~\NUM{3.X} using
+SimpleITK~\NUM{v2.X}~\cite{lowekamp2013} and
+TotalSegmentator~\NUM{vX.X}~\cite{wasserthal2023}.
+Segmentation runs on a single \TODO{GPU model} (\TODO{X}\,GB VRAM).
+Registration (all three passes and B-spline) runs on CPU.
+\TODO{Report mean\,$\pm$\,SD wall-clock time per study per stage:
+segmentation / Z-align / rigid (P0 + P1 + P2) / deformable.}
+
+\subsection{Pipeline Stage Ablation}
+\label{sec:ablation}
+
+Table~\ref{tab:ablation} reports eroded Dice and centroid displacement
+across all organ groups and phases at each pipeline stage.
+
+\begin{table*}[t]
+\centering
+\caption{%
+  Registration quality at each pipeline stage.
+  Eroded Dice (higher is better) and centroid displacement in mm
+  (lower is better), reported as median\,$\pm$\,IQR across
+  \NUM{N} studies per phase. NC is the fixed reference. \BLANK{} =
+  result pending.
+}
+\label{tab:ablation}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{ll cccc cccc cccc}
+\toprule
+& & \multicolumn{4}{c}{\textbf{Parenchymal}} &
+    \multicolumn{4}{c}{\textbf{Vascular}} &
+    \multicolumn{4}{c}{\textbf{Skeletal}} \\
+\cmidrule(lr){3-6}\cmidrule(lr){7-10}\cmidrule(lr){11-14}
+\textbf{Stage} & \textbf{Ph.} &
+  \multicolumn{2}{c}{Dice $\uparrow$} & \multicolumn{2}{c}{CD$\downarrow$} &
+  \multicolumn{2}{c}{Dice $\uparrow$} & \multicolumn{2}{c}{CD$\downarrow$} &
+  \multicolumn{2}{c}{Dice $\uparrow$} & \multicolumn{2}{c}{CD$\downarrow$} \\
+\midrule
+Baseline    & A & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK \\
+            & V & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK \\
+\midrule
+Z-Aligned   & A & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK \\
+            & V & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK \\
+\midrule
+Rigid       & A & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK \\
+            & V & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK \\
+\midrule
+Deformable  & A & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK \\
+            & V & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK & \BLANK \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\TODO{%
+  Analysis paragraph: Which stage provides the largest gain?
+  Does Z-alignment alone close most of the gap, or is intensity
+  registration necessary? Do vascular structures improve less than
+  parenchymal (expected due to smaller volume)? Do vertebrae confirm
+  rigid correctness?
+}
+
+\subsection{Similarity Metric Ablation}
+\label{sec:metric_ablation}
+
+Table~\ref{tab:metric} isolates the contribution of the anatomy
+constraint from the choice of similarity metric by fixing the pipeline
+stage (deformable) and varying both the metric and its evaluation
+domain.
+
+\begin{table}[t]
+\centering
+\caption{%
+  Effect of similarity metric and masking on deformable registration
+  quality. All conditions use identical pipeline stages and
+  hyperparameters. Median eroded Dice / centroid displacement (mm).
+  \BLANK{} = result pending.
+}
+\label{tab:metric}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Condition} & \multicolumn{2}{c}{\textbf{Arterial}} &
+                     \multicolumn{2}{c}{\textbf{Venous}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+ & Dice $\uparrow$ & CD $\downarrow$ & Dice $\uparrow$ & CD $\downarrow$ \\
+\midrule
+MSE (whole image)     & \BLANK & \BLANK & \BLANK & \BLANK \\
+NCC (whole image)     & \BLANK & \BLANK & \BLANK & \BLANK \\
+MSE (organ mask)      & \BLANK & \BLANK & \BLANK & \BLANK \\
+NCC (organ mask)      & \BLANK & \BLANK & \BLANK & \BLANK \\
+MMI (whole image)     & \BLANK & \BLANK & \BLANK & \BLANK \\
+\textbf{MMI (organ mask)} & \textbf{\BLANK} & \textbf{\BLANK} & \textbf{\BLANK} & \textbf{\BLANK} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\TODO{%
+  Analysis: Show (a) masking consistently improves over whole-image
+  for any metric, and (b) MMI is best within the masked setting.
+  This is the core empirical argument of the paper.
+}
+
+\subsection{Comparison with Existing Methods}
+\label{sec:comparison}
+
+\begin{table*}[t]
+\centering
+\caption{%
+  Comparison against existing registration methods at the
+  deformable/non-rigid stage on \NUM{265} studies.
+  CD = centroid displacement (mm). Time = mean wall-clock
+  seconds per study (CPU unless noted). \textbf{Bold} = best per column.
+  \BLANK{} = result pending.
+}
+\label{tab:comparison}
+\begin{tabular}{l ccc ccc ccc c}
+\toprule
+& \multicolumn{3}{c}{\textbf{Parenchymal}} &
+  \multicolumn{3}{c}{\textbf{Vascular}} &
+  \multicolumn{3}{c}{\textbf{Skeletal}} &
+  \textbf{Time (s)} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}
+\textbf{Method} &
+  Dice $\uparrow$ & CD $\downarrow$ && Dice $\uparrow$ & CD $\downarrow$ &&
+  Dice $\uparrow$ & CD $\downarrow$ && \\
+\midrule
+ANTs SyN~\cite{avants2008}
+  & \BLANK & \BLANK && \BLANK & \BLANK && \BLANK & \BLANK && \BLANK \\
+elastix B-spline~\cite{klein2010}
+  & \BLANK & \BLANK && \BLANK & \BLANK && \BLANK & \BLANK && \BLANK \\
+DEEDS~\cite{heinrich2013}
+  & \BLANK & \BLANK && \BLANK & \BLANK && \BLANK & \BLANK && \BLANK \\
+VoxelMorph~\cite{balakrishnan2019}
+  & \BLANK & \BLANK && \BLANK & \BLANK && \BLANK & \BLANK && \BLANK \\
+\midrule
+\textbf{Proposed}
+  & \textbf{\BLANK} & \textbf{\BLANK} && \textbf{\BLANK} & \textbf{\BLANK} &&
+    \textbf{\BLANK} & \textbf{\BLANK} && \BLANK \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\TODO{%
+  Analysis: Where does the proposed method outperform baselines most
+  clearly? Any cases where a baseline wins? Discuss the time--accuracy
+  trade-off.
+}
+
+\subsection{Qualitative Results}
+\label{sec:qual}
+
+\begin{figure*}[t]
+  \centering
+  \TODO{%
+    Figure 2: Axial overlay panels for a representative study.
+    Show NC (fixed) and arterial (moving) at four stages:
+    Baseline / Z-Aligned / Rigid / Deformable.
+    Use checkerboard or edge overlay. Annotate liver, aorta, L2.
+    Show one easy and one hard (large Z-offset) case.
+  }
+  \caption{Qualitative registration results for a representative study
+  (axial mid-liver slice). NC fixed phase shown in green, arterial
+  moving phase in magenta. Misalignment appears as colour fringing;
+  correct alignment produces a grey overlay.}
+  \label{fig:qual}
+\end{figure*}
+
+\TODO{One paragraph referencing Fig.~\ref{fig:qual}. Highlight
+progression from Baseline to Deformable. Note residual misalignment
+in difficult structures (pancreas, gallbladder) and explain why.}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Discussion}
+\label{sec:discussion}
+
+\TODO{%
+  D1 — Anatomy-constrained MMI.
+  Argue from Table~\ref{tab:metric}: masking matters more than metric
+  choice (i.e., MMI masked $>$ MMI whole-image $\geq$ NCC masked),
+  or vice versa depending on results. Explain mechanistically:
+  in multi-phase CT, the joint intensity histogram between NC and
+  arterial liver contains two distinct modes (enhancing vs.
+  non-enhancing parenchyma). Whole-image MMI marginalises over this
+  heterogeneity; organ-masked MMI evaluates it where tissue identity
+  is known.
+}
+
+\TODO{%
+  D2 — Kabsch SVD initialisation.
+  Argue that Pass~0 provides a geometrically correct warm start that
+  prevents Pass~1 from converging to local optima in the Dice/centroid
+  loss surface. If the Pass~0 ablation is available (rigid with and
+  without Kabsch init), quantify the gain here.
+}
+
+\TODO{%
+  D3 — Organ-group observations.
+  Parenchymal: liver and spleen show the largest absolute improvement.
+  Pancreas and gallbladder: small volume, contrast-variable, expect
+  higher variance.
+  Vascular: aorta is rigid and contrast-bright in arterial; expect
+  good alignment. IVC is compressible — may show higher centroid
+  displacement.
+  Skeletal: any residual centroid error here indicates a registration
+  failure, not an anatomy challenge.
+}
+
+\TODO{%
+  D4 — Limitations.
+  (1) No deep learning component — iterative inference.
+  Report total study time; discuss suitability for retrospective
+  cohort analysis vs. real-time.
+  (2) Pipeline depends on TotalSegmentator quality; segmentation
+  failures propagate downstream (characterise failure rate).
+  (3) Evaluation uses pseudo ground truth (TotalSegmentator masks);
+  no manually annotated landmarks.
+  (4) Extension to other datasets (CHAOS, LiTS, multi-centre trials)
+  requires verifying DICOM encoding conventions.
+}
+
+% ══════════════════════════════════════════════════════════════════════════
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented a multi-phase abdominal CT registration pipeline whose
+central design principle is the confinement of intensity similarity
+to an automatically derived mask of contrast-stable organs.
+By evaluating Mattes Mutual Information exclusively within $\Mreg$
+— a mask from which bowel, contrast-enhancing vascular tissue, and
+peristaltic structures are explicitly excluded — the pipeline avoids
+the corrupting influence of phase-dependent HU variation on the
+registration objective.
+A bone-anchored Kabsch SVD initialisation and a derivative-free
+Nelder-Mead refinement stage, together with a Sobel-gradient NCC
+acceptance gate, provide geometrically robust convergence across
+scanner types and large axial offsets.
+\TODO{Quantitative summary: e.g., ``On \NUM{265} VinDr studies, the
+proposed method achieves \BLANK\,\% higher median eroded Dice and
+\BLANK\,mm lower centroid displacement than the strongest classical
+baseline.''}
+The four-tier mask construction and eroded-Dice evaluation protocol
+provide a reproducible benchmark for future registration methods on
+multi-phase abdominal CT.
+
+% ══════════════════════════════════════════════════════════════════════════
+\bibliographystyle{IEEEtran}
+% \bibliography{references}  % Uncomment and use .bib file before submission
+
+\begin{thebibliography}{99}
+
+% ── Classical registration ─────────────────────────────────────────────
+\bibitem{rueckert1999}
+D.~Rueckert \emph{et~al.},
+``Nonrigid registration using free-form deformations: Application to
+breast MR images,''
+\emph{IEEE Trans.\ Med.\ Imag.}, vol.~18, no.~8, pp.~712--721, 1999.
+
+\bibitem{thirion1998}
+J.-P.~Thirion,
+``Image matching as a diffusion process: An analogy with Maxwell's
+demons,''
+\emph{Med.\ Image Anal.}, vol.~2, no.~3, pp.~243--260, 1998.
+
+\bibitem{avants2008}
+B.~B.~Avants \emph{et~al.},
+``Symmetric diffeomorphic image registration with cross-correlation:
+Evaluating automated labeling of elderly and neurodegenerative brain,''
+\emph{Med.\ Image Anal.}, vol.~12, no.~1, pp.~26--41, 2008.
+
+\bibitem{klein2010}
+S.~Klein \emph{et~al.},
+``Elastix: A toolbox for intensity-based medical image registration,''
+\emph{IEEE Trans.\ Med.\ Imag.}, vol.~29, no.~1, pp.~196--205, 2010.
+
+\bibitem{mattes2001}
+D.~Mattes \emph{et~al.},
+``Nonrigid multimodality image registration,''
+in \emph{Proc.\ SPIE Med.\ Imag.}, vol.~4322, 2001, pp.~1609--1620.
+
+\bibitem{wells1996}
+W.~M.~Wells~III \emph{et~al.},
+``Multi-modal volume registration by maximization of mutual information,''
+\emph{Med.\ Image Anal.}, vol.~1, no.~1, pp.~35--51, 1996.
+
+\bibitem{pluim2003}
+J.~P.~W.~Pluim, J.~B.~A.~Maintz, and M.~A.~Viergever,
+``Mutual-information based registration of medical images: A survey,''
+\emph{IEEE Trans.\ Med.\ Imag.}, vol.~22, no.~8, pp.~986--1004, 2003.
+
+\bibitem{studholme1999}
+C.~Studholme, D.~L.~G.~Hill, and D.~J.~Hawkes,
+``An overlap invariant entropy measure of 3D medical image alignment,''
+\emph{Pattern Recognition}, vol.~32, no.~1, pp.~71--86, 1999.
+
+\bibitem{metz2011}
+C.~T.~Metz \emph{et~al.},
+``Nonrigid registration of dynamic medical imaging data using nD+t
+B-splines and a groupwise optimization approach,''
+\emph{Med.\ Image Anal.}, vol.~15, no.~2, pp.~238--249, 2011.
+
+\bibitem{heinrich2013}
+M.~P.~Heinrich \emph{et~al.},
+``DEEDS: MRF-based nonlinear image registration using efficient discrete
+optimization,''
+\emph{Int.\ J.\ Comput.\ Vis.}, vol.~103, no.~3, pp.~384--400, 2013.
+
+\bibitem{hering2022}
+A.~Hering \emph{et~al.},
+``Learn2Reg: Comprehensive multi-task medical image registration challenge,
+dataset and evaluation,''
+\emph{IEEE Trans.\ Med.\ Imag.}, vol.~41, no.~6, pp.~1458--1476, 2022.
+
+\bibitem{murphy2011}
+K.~Murphy \emph{et~al.},
+``Semi-automatic construction of reference standards for evaluation of
+image registration,''
+\emph{Med.\ Image Anal.}, vol.~15, no.~1, pp.~71--84, 2011.
+
+% ── Learning-based registration ───────────────────────────────────────
+\bibitem{balakrishnan2019}
+G.~Balakrishnan \emph{et~al.},
+``VoxelMorph: A learning framework for deformable medical image
+registration,''
+\emph{IEEE Trans.\ Med.\ Imag.}, vol.~38, no.~8, pp.~1788--1800, 2019.
+
+\bibitem{chen2022}
+J.~Chen \emph{et~al.},
+``TransMorph: Transformer for unsupervised medical image registration,''
+\emph{Med.\ Image Anal.}, vol.~82, p.~102615, 2022.
+
+\bibitem{mok2020}
+T.~C.~W.~Mok and A.~Chung,
+``Large deformation diffeomorphic image registration with Laplacian
+pyramid networks,''
+in \emph{Proc.\ MICCAI}, 2020, pp.~211--221.
+
+\bibitem{hoopes2021}
+A.~Hoopes \emph{et~al.},
+``HyperMorph: Amortised hyperparameter learning for image registration,''
+in \emph{Proc.\ IPMI}, 2021, pp.~3--17.
+
+\bibitem{tian2023}
+H.~Tian \emph{et~al.},
+``UniGradICON: A foundation model for medical image registration,''
+\emph{arXiv:2403.05780}, 2024.
+% TODO: Check for published venue; arXiv as placeholder.
+
+\bibitem{zhao2019}
+Z.~Zhao \emph{et~al.},
+``Recursive cascaded networks for unsupervised medical image registration,''
+in \emph{Proc.\ ICCV}, 2019, pp.~10600--10610.
+
+\bibitem{xu2019}
+Z.~Xu and M.~Niethammer,
+``DeepAtlas: Joint semi-supervised learning of image registration and
+segmentation,''
+in \emph{Proc.\ MICCAI}, 2019, pp.~420--429.
+
+% ── Anatomy-constrained / masked registration ─────────────────────────
+\bibitem{hu2018}
+Y.~Hu \emph{et~al.},
+``Weakly-supervised convolutional neural networks for multimodal image
+registration,''
+\emph{Med.\ Image Anal.}, vol.~49, pp.~1--13, 2018.
+
+\bibitem{oktay2017}
+O.~Oktay \emph{et~al.},
+``Anatomically constrained neural networks (ACNN): Application to
+cardiac image enhancement and segmentation,''
+\emph{IEEE Trans.\ Med.\ Imag.}, vol.~37, no.~2, pp.~384--395, 2018.
+% Note: Published in IEEE TMI 2018; arXiv submitted 2017.
+
+\bibitem{heinrich2012}
+M.~P.~Heinrich \emph{et~al.},
+``MIND: Modality independent neighbourhood descriptor for multi-modal
+deformable registration,''
+\emph{Med.\ Image Anal.}, vol.~16, no.~7, pp.~1423--1435, 2012.
+
+\bibitem{papiez2014}
+B.~W.~Papiez \emph{et~al.},
+``An implicit sliding-motion preserving regularisation via bilateral
+filtering for deformable image registration,''
+\emph{Med.\ Image Anal.}, vol.~18, no.~8, pp.~1323--1335, 2014.
+
+\bibitem{devos2019}
+B.~D.~de~Vos \emph{et~al.},
+``A deep learning framework for unsupervised affine and deformable
+image registration,''
+\emph{Med.\ Image Anal.}, vol.~52, pp.~128--143, 2019.
+
+% ── Tools and infrastructure ──────────────────────────────────────────
+\bibitem{wasserthal2023}
+J.~Wasserthal \emph{et~al.},
+``TotalSegmentator: Robust segmentation of 104 anatomical structures
+in CT images,''
+\emph{Radiol.:\ Artif.\ Intell.}, vol.~5, no.~5, 2023.
+
+\bibitem{lowekamp2013}
+B.~C.~Lowekamp \emph{et~al.},
+``The design of SimpleITK,''
+\emph{Front.\ Neuroinform.}, vol.~7, p.~45, 2013.
+
+\bibitem{kabsch1976}
+W.~Kabsch,
+``A solution for the best rotation to relate two sets of vectors,''
+\emph{Acta Crystallogr.\ A}, vol.~32, no.~5, pp.~922--923, 1976.
+
+\bibitem{nelder1965}
+J.~A.~Nelder and R.~Mead,
+``A simplex method for function minimization,''
+\emph{Comput.\ J.}, vol.~7, no.~4, pp.~308--313, 1965.
+
+% ── Clinical motivation ───────────────────────────────────────────────
+\bibitem{forner2018}
+A.~Forner, M.~Reig, and J.~Bruix,
+``Hepatocellular carcinoma,''
+\emph{Lancet}, vol.~391, no.~10127, pp.~1301--1314, 2018.
+
+\bibitem{easl2018}
+European Association for the Study of the Liver,
+``EASL clinical practice guidelines: Management of hepatocellular
+carcinoma,''
+\emph{J.\ Hepatol.}, vol.~69, no.~1, pp.~182--236, 2018.
+
+% ── Dataset ───────────────────────────────────────────────────────────
+\bibitem{vindr}
+\TODO{VinDr multi-phase CT dataset citation. Search PhysioNet or
+  authors' publications for the correct reference. Placeholder.}
+
+\end{thebibliography}
+
+\end{document}
