@@ -33,7 +33,7 @@ from scipy.optimize import minimize
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent))
 try:
-    from . import _common as K
+    from ..registration import _common as K
 except ImportError:
     import _common as K
 

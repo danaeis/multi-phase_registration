@@ -38,6 +38,14 @@ import nibabel as nib
 
 import compare_config as C
 
+try:
+    from profiling import profile_stage as _profile_stage
+    _PROFILING = True
+except ImportError:
+    _PROFILING = False
+
+PROFILING_DIR = C.RESULTS_DIR / "profiling"
+
 
 # ---------------------------------------------------------------------------
 # Iterate (study, fixed_nc, moving_phase) work items from the aligned crops
@@ -47,26 +55,65 @@ def iter_pairs(labels_df: pd.DataFrame,
                input_dir: Path = C.ALIGNED_CROP_DIR,
                vol_postfix: str = "_aligned.nii.gz",
                seg_postfix: str = "_aligned_seg_reg.nii.gz",
-               ref_phase: str = C.REF_PHASE) -> Iterator[dict]:
-    """Yield one dict per (study, moving phase) with resolved fixed/moving paths."""
-    study_dirs = sorted(d for d in os.listdir(input_dir)
-                        if (input_dir / d).is_dir())
+               ref_phase: str = C.REF_PHASE,
+               seg_dir: Optional[Path] = None,
+               flat: bool = False) -> Iterator[dict]:
+    """
+    Yield one dict per (study, moving phase) with resolved fixed/moving paths.
+
+    Two on-disk layouts are supported:
+
+      nested (flat=False, the default — aligned/baseline crops):
+          input_dir/{study}/{study}_{series}{vol_postfix}
+          (seg_dir or input_dir)/{study}/{study}_{series}{seg_postfix}
+
+      flat (flat=True — raw input):
+          input_dir/{study}_{series}{vol_postfix}              (no study subdir)
+          seg_dir/{study}_{series}{seg_postfix}                (no study subdir,
+                                                                 separate dir tree,
+                                                                 e.g. ts_segmentation/)
+
+    `seg_dir` defaults to `input_dir` (segs alongside vols — the nested case).
+    Pass a different directory for layouts where segmentations live in a
+    separate tree; required for `raw` input (sibling `ts_segmentation/`).
+    """
+    if seg_dir is None:
+        seg_dir = input_dir
+
+    if flat:
+        # Studies aren't directories here — derive the study list from the
+        # labels CSV itself, since filenames are {study}_{series}{postfix}.
+        study_dirs = sorted(labels_df["StudyInstanceUID"].unique())
+    else:
+        study_dirs = sorted(d for d in os.listdir(input_dir)
+                            if (input_dir / d).is_dir())
+
+    def _vol_path(study: str, sid: str) -> Path:
+        if flat:
+            return input_dir / f"{study}_{sid}{vol_postfix}"
+        return input_dir / study / f"{study}_{sid}{vol_postfix}"
+
+    def _seg_path(study: str, sid: str) -> Path:
+        if flat:
+            return seg_dir / f"{study}_{sid}{seg_postfix}"
+        return seg_dir / study / f"{study}_{sid}{seg_postfix}"
+
     for study in study_dirs:
         rows = labels_df[labels_df["StudyInstanceUID"] == study]
         nc = rows[rows["Label"] == ref_phase]
         if nc.empty:
             continue
         nc_sid = nc.iloc[0]["SeriesInstanceUID"]
-        nc_vol = input_dir / study / f"{study}_{nc_sid}{vol_postfix}"
-        nc_seg = input_dir / study / f"{study}_{nc_sid}{seg_postfix}"
+        nc_vol = _vol_path(study, nc_sid)
+        nc_seg = _seg_path(study, nc_sid)
         if not (nc_vol.exists() and nc_seg.exists()):
             continue
         for _, r in rows.iterrows():
             sid, phase = r["SeriesInstanceUID"], r["Label"]
             if phase == ref_phase:
                 continue
-            mv_vol = input_dir / study / f"{study}_{sid}{vol_postfix}"
-            mv_seg = input_dir / study / f"{study}_{sid}{seg_postfix}"
+            mv_vol = _vol_path(study, sid)
+            mv_seg = _seg_path(study, sid)
             if not (mv_vol.exists() and mv_seg.exists()):
                 continue
             yield {
@@ -203,10 +250,36 @@ def run_baseline(algo_tag: str,
     cond = C.CONDITIONS[tag]
     src = C.INPUTS[input_key]
 
+    # `raw` input is laid out flat: volumes directly under src.dir as
+    # {study}_{series}_standardized.nii.gz, with segmentations in a SEPARATE
+    # sibling tree, ts_segmentation/, also flat, as
+    # {study}_{series}_seg_reg.nii.gz (always the "reg" variant, never "full").
+    # compare_config.py may already define these explicitly on the InputSpec
+    # (seg_dir / flat / seg_postfix) — prefer those if present, and only fall
+    # back to the convention below when they're absent, so this keeps working
+    # if config.py is updated later.
+    is_raw = (input_key == "raw")
+    flat = getattr(src, "flat", is_raw)
+    seg_dir = getattr(src, "seg_dir", None)
+    seg_postfix = getattr(src, "seg_postfix", None)
+    if is_raw:
+        if seg_dir is None:
+            seg_dir = Path(src.dir).parent / "ts_segmentation"
+        if seg_postfix is None:
+            seg_postfix = "_seg_reg.nii.gz"
+    else:
+        if seg_dir is None:
+            seg_dir = src.dir
+        if seg_postfix is None:
+            seg_postfix = src.seg_postfix
+
     print(f"\n{'='*80}\n{tag}\n  input : {src.dir}\n  output: {cond.base_dir}\n{'='*80}")
+    if is_raw:
+        print(f"  (raw layout: flat vols in {src.dir}, flat segs in {seg_dir})")
 
     n_ok = n_skip = n_fail = 0
-    for item in iter_pairs(labels_df, src.dir, src.vol_postfix, src.seg_postfix):
+    for item in iter_pairs(labels_df, src.dir, src.vol_postfix, seg_postfix,
+                           seg_dir=seg_dir, flat=flat):
         if studies and item["study"] not in studies:
             continue
 
@@ -221,7 +294,18 @@ def run_baseline(algo_tag: str,
             moving = sitk.ReadImage(item["moving_vol"])
             mov_sg = sitk.ReadImage(item["moving_seg"])
 
-            res = register_fn(fixed, moving, mov_sg, item)
+            if _PROFILING:
+                _ctx = _profile_stage(
+                    algo_tag, input_key,
+                    item["study"], item["phase"],
+                    PROFILING_DIR,
+                )
+            else:
+                import contextlib
+                _ctx = contextlib.nullcontext()
+
+            with _ctx:
+                res = register_fn(fixed, moving, mov_sg, item)
 
             if res.warped_vol is None and res.transform is not None:
                 res.warped_vol = warp_volume(moving, fixed, res.transform)
@@ -251,8 +335,11 @@ def make_cli(algo_tag: str, register_fn_factory):
     """
     import argparse
     p = argparse.ArgumentParser(description=f"{algo_tag} comparison runner")
-    p.add_argument("--input", choices=["aligned", "baseline", "both"],
-                   default="both", help="Which input source(s) to run on.")
+    p.add_argument("--input", choices=["aligned", "baseline", "raw", "both", "all"],
+                   default="both",
+                   help="aligned (z-aligned crops), baseline (crop only), "
+                        "raw (no crop/align). both=aligned+baseline, "
+                        "all=aligned+baseline+raw.")
     p.add_argument("--studies", nargs="*", default=None,
                    help="Optional subset of study IDs.")
     p.add_argument("--labels_csv", default=str(C.LABELS_CSV))
@@ -263,7 +350,12 @@ def make_cli(algo_tag: str, register_fn_factory):
     labels_df = pd.read_csv(args.labels_csv)
     register_fn = register_fn_factory(args)
 
-    inputs = ["aligned", "baseline"] if args.input == "both" else [args.input]
+    if args.input == "both":
+        inputs = ["aligned", "baseline"]
+    elif args.input == "all":
+        inputs = ["aligned", "baseline", "raw"]
+    else:
+        inputs = [args.input]
     algo = C.BASELINE_ALGOS[algo_tag]
     for ikey in inputs:
         if ikey == "baseline" and not algo.run_on_baseline:
@@ -271,3 +363,12 @@ def make_cli(algo_tag: str, register_fn_factory):
             continue
         run_baseline(algo_tag, ikey, register_fn, labels_df,
                      studies=args.studies, skip_existing=not args.no_skip)
+
+
+
+
+# export DEEDS_BIN=/media/external20/saeedeh_danaei/sample_data_reg/multi-phase_registration/compare_registrtaion/deedsBCV/deedsBCV
+# export LINEAR_BIN=/media/external20/saeedeh_danaei/sample_data_reg/multi-phase_registration/compare_registrtaion/deedsBCV/linearBCV
+# export APPLYFLOAT_BIN=/media/external20/saeedeh_danaei/sample_data_reg/multi-phase_registration/compare_registrtaion/deedsBCV/applyBCVfloat
+
+# python run_deeds.py --input all --studies ONE_STUDY_ID   # smoke-test on one first

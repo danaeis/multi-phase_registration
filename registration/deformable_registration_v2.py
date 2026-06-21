@@ -5,12 +5,25 @@ Four selectable metrics (one per ablation row):
 
   --metric grad_ncc    Central-diff |∇HU| + ANTS NCC         [HEADLINE]
                        Phase-invariant sharp-edge alignment.
-  --metric sobel_ncc   Sobel |∇HU| (σ=0.75mm) + ANTS NCC    [NEW ABLATION]
+  --metric sobel_ncc   Sobel |∇HU| (σ=0.75mm) + ANTS NCC    [ABLATION]
                        Pre-smoothed edges; less noise-sensitive than grad_ncc.
   --metric mmi         Mattes MI on raw HU                    [ABLATION]
                        Traditional; phase-variant HU may hurt.
   --metric seg_dist    Organ signed-distance maps + MSE        [ABLATION]
                        Pure geometry; contrast-invariant but seg-quality-limited.
+  --metric mind_ncc    MIND 6-offset descriptor + ANTS NCC    [ABLATION]
+                       Self-similarity descriptor (Heinrich 2012); modality-
+                       independent, robust to phase-variant HU. NCC on collapsed
+                       scalar MIND feature map ∈ (0,1].
+  --metric sobel_binary  Per-organ Otsu binary edges + MSE    [ABLATION]
+                       Sobel magnitude binarised with per-organ Otsu threshold;
+                       MSE drives exact boundary overlap. Threshold adapts per
+                       organ label and per study from local edge distribution.
+  --metric mind_sobel  MIND × (1 + sobel_binary) + ANTS NCC  [ABLATION]
+                       Boundary-boosted MIND: MIND scalar values are doubled at
+                       organ edge voxels (where binary Sobel = 1), unchanged
+                       elsewhere. Combines MIND's phase-invariant structural
+                       signal with hard boundary emphasis in one NCC objective.
 
 Bugs fixed vs the previous version:
   1. LBFGSB function-eval budget: maximumNumberOfFunctionEvaluations was
@@ -108,9 +121,9 @@ OUTPUT_DIR_BASE    = Path(MAIN_PATH + "deformable_registered")  # _<metric>[_bas
 LABELS_CSV         = MAIN_PATH + "labels.csv"
 
 # Postfixes — match rigid Pass 2 output (both aligned and baseline pipelines)
-VOL_POSTFIX      = "_rigid2.nii.gz"
-SEG_REG_POSTFIX  = "_rigid2_seg_reg.nii.gz"
-SEG_FULL_POSTFIX = "_rigid2_seg_full.nii.gz"
+VOL_POSTFIX      = "_rigid1.nii.gz"
+SEG_REG_POSTFIX  = "_rigid1_seg_reg.nii.gz"
+SEG_FULL_POSTFIX = "_rigid1_seg_full.nii.gz"
 
 # ── B-spline hyperparameters ───────────────────────────────────────────────────
 GRID_SPACING_MM    = 25.0    # control-point grid spacing (mm). 40=coarse / 25=default / 15=fine
@@ -122,7 +135,7 @@ NCC_RADIUS         = 4       # ANTS NCC neighborhood window half-radius (voxels)
 FOLDING_WARN_PCT   = 1.0
 FOLDING_SEVERE_PCT = 5.0
 
-METRICS          = ("grad_ncc", "sobel_ncc", "mmi", "seg_dist")
+METRICS          = ("grad_ncc", "sobel_ncc", "mmi", "seg_dist", "mind_ncc", "sobel_binary", "mind_sobel")
 EXAMPLE_STUDY_ID = "1.2.840.113619.2.359.3.2831208971.108.1589585466.773"
 
 # ── Organ weights ──────────────────────────────────────────────────────────────
@@ -415,6 +428,161 @@ def _sobel_magnitude(img_sitk: sitk.Image,
     return sitk.Clamp(g, lowerBound=0.0, upperBound=clamp_max)
 
 
+# ── MIND cardinal offsets: (axis, shift) for ±Z, ±Y, ±X ────────────────────
+_MIND_OFFSETS: List[Tuple[int, int]] = [
+    (0, +1), (0, -1),   # ±Z
+    (1, +1), (1, -1),   # ±Y
+    (2, +1), (2, -1),   # ±X
+]
+
+
+def _otsu_1d(values: np.ndarray) -> float:
+    """
+    Compute Otsu threshold for a 1-D float array using 256 histogram bins.
+    Maximises between-class variance in one pass; returns value in original range.
+    """
+    n = len(values)
+    if n < 100:
+        return float(np.median(values))
+    hist, edges = np.histogram(values, bins=256)
+    centers = (edges[:-1] + edges[1:]) * 0.5
+    w0 = np.cumsum(hist).astype(np.float64)
+    w1 = float(n) - w0
+    mu0 = np.cumsum(hist * centers) / np.maximum(w0, 1e-8)
+    mu1 = (np.sum(hist * centers) - np.cumsum(hist * centers)) / np.maximum(w1, 1e-8)
+    sigma_b = w0 * w1 * (mu0 - mu1) ** 2
+    valid = (w0 > 0) & (w1 > 0)
+    if not valid.any():
+        return float(centers[len(centers) // 2])
+    return float(centers[np.argmax(np.where(valid, sigma_b, -1.0))])
+
+
+def _mind_feature(img_sitk: sitk.Image) -> sitk.Image:
+    """
+    6-offset MIND descriptor collapsed to a scalar feature map for NCC.
+
+    Algorithm (Heinrich et al. 2012 — MIND: Modality Independent Neighbourhood
+    Descriptor):
+      1. For each offset r in {±Z, ±Y, ±X}:
+            D(x, r) = (I(x) − I(x+r))²
+      2. Local variance:  V(x) = mean_r D(x, r) + ε
+      3. MIND(x, r)    = exp(−D(x, r) / 2V(x))
+      4. Collapse       : mind_scalar(x) = mean_r MIND(x, r)   → scalar ∈ (0, 1]
+
+    NCC is then applied to mind_scalar: structurally similar neighbourhoods
+    produce consistent self-similarity patterns regardless of absolute HU, making
+    the metric phase-invariant.
+
+    Memory note: two sequential passes over the volume avoid holding 6 diff arrays
+    simultaneously. Peak usage ≈ 3× volume (img_np, V, mind_sum + one temp diff).
+    """
+    img_f  = sitk.Cast(img_sitk, sitk.sitkFloat32)
+    img_np = sitk.GetArrayFromImage(img_f).astype(np.float32)   # (Z, Y, X)
+
+    # Pass 1 — variance estimate V(x) = mean of 6 squared differences
+    diff_sq_sum = np.zeros_like(img_np)
+    for ax, sh in _MIND_OFFSETS:
+        diff_sq_sum += (img_np - np.roll(img_np, sh, axis=ax)) ** 2
+    V = diff_sq_sum / 6.0 + 1e-6
+    del diff_sq_sum
+
+    # Pass 2 — MIND values, summed and collapsed
+    mind_sum = np.zeros_like(img_np)
+    for ax, sh in _MIND_OFFSETS:
+        mind_sum += np.exp(-(img_np - np.roll(img_np, sh, axis=ax)) ** 2 / (2.0 * V))
+    mind_scalar = (mind_sum / 6.0).astype(np.float32)
+    del mind_sum, V
+
+    out = sitk.GetImageFromArray(mind_scalar)
+    out.CopyInformation(img_f)
+    return out
+
+
+def _sobel_binary(
+        img_sitk:     sitk.Image,
+        seg_sitk:     sitk.Image,
+        organ_weights: Dict[int, float] = ORGAN_WEIGHTS,
+        sigma_mm:     float = SOBEL_SIGMA_MM,
+) -> sitk.Image:
+    """
+    Per-organ Otsu-thresholded binary edge map for sobel_binary metric.
+
+    For each organ label with ≥ 50 voxels:
+      1. Extract Sobel magnitude values inside the organ mask.
+      2. Compute Otsu threshold from those values (adaptive per organ per study).
+      3. Mark voxels where Sobel > threshold as edge (1.0), others 0.0.
+    Final binary map = union of all per-organ edge regions.
+
+    Using per-organ Otsu rather than a global threshold ensures that low-contrast
+    structures (iliopsoas, IVC) get an appropriate threshold without being drowned
+    out by high-gradient bone edges.
+
+    MSE on these binary maps drives exact organ-boundary coincidence; the loss is
+    maximally interpretable — every non-zero residual is a missed or extra edge voxel.
+    """
+    sobel_sitk = _sobel_magnitude(img_sitk, sigma_mm=sigma_mm)
+    sobel_np   = sitk.GetArrayFromImage(sobel_sitk).astype(np.float32)   # (Z, Y, X)
+    seg_np     = np.round(sitk.GetArrayFromImage(seg_sitk)).astype(np.int32)
+
+    binary = np.zeros_like(sobel_np, dtype=np.float32)
+    labels_found = 0
+
+    for label, _ in organ_weights.items():
+        mask = seg_np == label
+        if int(mask.sum()) < 50:
+            continue
+        labels_found += 1
+        thr = _otsu_1d(sobel_np[mask])
+        binary[mask & (sobel_np > thr)] = 1.0
+
+    if labels_found == 0:
+        # Fallback: global Otsu on full volume (only if seg is empty/mismatched)
+        print("  ⚠  sobel_binary: no organ labels found — falling back to global Otsu")
+        thr    = _otsu_1d(sobel_np.ravel())
+        binary = (sobel_np > thr).astype(np.float32)
+
+    edge_pct = 100.0 * binary.mean()
+    print(f"  sobel_binary: {labels_found} organs thresholded  "
+          f"edge_vox={int(binary.sum()):,}  ({edge_pct:.1f}% of vol)")
+
+    out = sitk.GetImageFromArray(binary)
+    out.CopyInformation(img_sitk)
+    return out
+
+
+def _mind_sobel_feature(
+        img_sitk: sitk.Image,
+        seg_sitk: sitk.Image,
+) -> sitk.Image:
+    """
+    Boundary-boosted MIND composite feature for mind_sobel metric.
+
+    Formula:  combined(x) = mind_scalar(x) × (1 + sobel_binary(x))
+
+    Effect:
+      - At organ edge voxels (sobel_binary = 1): MIND value is doubled → the NCC
+        window sees twice the contrast at boundaries, pulling the gradient signal
+        towards correct boundary alignment.
+      - Interior / background voxels (sobel_binary = 0): pure MIND signal,
+        preserving phase-invariant structural matching across the whole organ.
+
+    This is strictly stronger than either individual metric:
+      - vs mind_ncc: adds hard boundary emphasis without discarding interior structure.
+      - vs sobel_binary: retains continuous structural signal rather than working
+        only on sparse binary edges.
+
+    The output is ∈ (0, 2] (MIND ∈ (0,1] × factor ∈ {1,2}); NCC is applied since
+    the composite is a bounded, smooth-ish field rather than a pure binary signal.
+    """
+    mind_np  = sitk.GetArrayFromImage(_mind_feature(img_sitk)).astype(np.float32)
+    sobel_np = sitk.GetArrayFromImage(_sobel_binary(img_sitk, seg_sitk)).astype(np.float32)
+    combined = (mind_np * (1.0 + sobel_np)).astype(np.float32)
+
+    out = sitk.GetImageFromArray(combined)
+    out.CopyInformation(img_sitk)
+    return out
+
+
 def _seg_distance_map(seg_sitk: sitk.Image,
                       labels: Dict[int, float] = ORGAN_WEIGHTS) -> sitk.Image:
     """
@@ -455,6 +623,13 @@ def _metric_images(
         return _sobel_magnitude(fixed_img), _sobel_magnitude(moving_img)
     if metric == "seg_dist":
         return _seg_distance_map(fixed_seg), _seg_distance_map(moving_seg)
+    if metric == "mind_ncc":
+        return _mind_feature(fixed_img), _mind_feature(moving_img)
+    if metric == "sobel_binary":
+        return _sobel_binary(fixed_img, fixed_seg), _sobel_binary(moving_img, moving_seg)
+    if metric == "mind_sobel":
+        return (_mind_sobel_feature(fixed_img, fixed_seg),
+                _mind_sobel_feature(moving_img, moving_seg))
     raise ValueError(f"Unknown metric '{metric}'. Choose from: {METRICS}")
 
 
@@ -505,12 +680,14 @@ def setup_bspline(
     # ── Metric ────────────────────────────────────────────────────────────────
     if metric == "mmi":
         reg.SetMetricAsMattesMutualInformation(numberOfHistogramBins=50)
-    elif metric in ("grad_ncc", "sobel_ncc"):
-        # ANTS NCC applied to edge-magnitude images — scale-invariant, works on
-        # [0, GRAD_CLAMP_MAX] range without normalisation.
+    elif metric in ("grad_ncc", "sobel_ncc", "mind_ncc", "mind_sobel"):
+        # NCC on edge-magnitude or collapsed MIND scalar maps.
+        # mind_ncc: MIND descriptor ∈ (0,1] — NCC is phase-invariant and robust
+        # to the near-uniform background values in MIND feature maps.
         reg.SetMetricAsANTSNeighborhoodCorrelation(radius=NCC_RADIUS)
-    elif metric == "seg_dist":
-        # MSE on signed-distance maps: L2 is the natural fit for distance fields.
+    elif metric in ("seg_dist", "sobel_binary"):
+        # MSE: natural for distance fields and binary {0,1} edge maps.
+        # sobel_binary: every residual pixel is a missing/extra edge → L2 exact.
         reg.SetMetricAsMeanSquares()
     else:
         raise ValueError(f"Unknown metric: {metric}")
@@ -957,10 +1134,13 @@ if __name__ == "__main__":
         "--metric", choices=METRICS, default="grad_ncc",
         help=(
             "Registration metric:\n"
-            "  grad_ncc  : central-diff |∇HU| + ANTS NCC  [HEADLINE]\n"
-            "  sobel_ncc : Sobel |∇HU| (σ=0.75mm) + ANTS NCC  [NEW]\n"
-            "  mmi       : raw HU + Mattes MI  [ABLATION]\n"
-            "  seg_dist  : organ signed-dist maps + MSE  [ABLATION]"
+            "  grad_ncc     : central-diff |∇HU| + ANTS NCC  [HEADLINE]\n"
+            "  sobel_ncc    : Sobel |∇HU| (σ=0.75mm) + ANTS NCC  [ABLATION]\n"
+            "  mmi          : raw HU + Mattes MI  [ABLATION]\n"
+            "  seg_dist     : organ signed-dist maps + MSE  [ABLATION]\n"
+            "  mind_ncc     : MIND 6-offset descriptor + ANTS NCC  [ABLATION]\n"
+            "  sobel_binary : per-organ Otsu binary edges + MSE  [ABLATION]\n"
+            "  mind_sobel   : MIND × (1 + sobel_binary) + ANTS NCC  [ABLATION]"
         ),
     )
     ap.add_argument("--all",       action="store_true", help="Batch over all studies")

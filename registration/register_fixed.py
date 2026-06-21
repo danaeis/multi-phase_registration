@@ -575,7 +575,7 @@ def make_euler3d(R, t, center):
     tx.SetComputeZYX(True)
     tx.SetCenter(center.tolist())
     tx.SetRotation(rx, ry, rz)
-    t_total = t_inv - (R_inv - np.eye(3)) @ center
+    t_total = t_inv + (R_inv - np.eye(3)) @ center
     tx.SetTranslation(t_total.tolist())
     return tx
 
@@ -754,7 +754,8 @@ def _resample_mask_to_moving(fixed_mask: sitk.Image,
 
 def _mean_centroid_error_mm(nc_seg: sitk.Image,
                              mov_seg_transformed: sitk.Image,
-                             label_weights: Dict[int, float]) -> float:
+                             label_weights: Dict[int, float],
+                             debug: bool = False) -> float:
     """
     Compute weighted mean centroid displacement (mm) between fixed (NC) seg
     and a transformed moving seg.  Used as the acceptance gate criterion.
@@ -772,11 +773,15 @@ def _mean_centroid_error_mm(nc_seg: sitk.Image,
         cf = _centroid_physical(nc_np,  label, sp, or_, di)
         cm = _centroid_physical(mov_np, label, sp, or_, di)
         if cf is None or cm is None:
+            if debug:
+                print(f"      [debug] label={label:3d}  MISSING  cf={'ok' if cf is not None else 'None'}  cm={'ok' if cm is not None else 'None'}")
             continue
-        total_err += w * float(np.linalg.norm(cf - cm))
+        d = float(np.linalg.norm(cf - cm))
+        if debug:
+            print(f"      [debug] label={label:3d}  err={d:7.2f}mm  cf={cf.round(1)}  cm={cm.round(1)}")
+        total_err += w * d
         total_w   += w
     return (total_err / total_w) if total_w > 0 else 1e6
-
 
 def gradient_edge_polish(
         fixed:      sitk.Image,
@@ -969,6 +974,7 @@ def register_study(
                 nc_seg_reg,
                 _apply_seg(mov_seg_reg, nc_img, tx0),
                 REFINEMENT_LABELS,
+                debug=True,
             )
             log.metric("pass0_kabsch", {
                 "series_id":       sid,

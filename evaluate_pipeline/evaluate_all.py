@@ -87,7 +87,8 @@ def run_condition(cond: C.Condition,
                   labels_df: pd.DataFrame,
                   labels_csv: str,
                   ref_phase: str,
-                  erosion_mm: float) -> Optional[pd.DataFrame]:
+                  erosion_mm: float,
+                  workers: int = 1) -> Optional[pd.DataFrame]:
     """Evaluate one condition. Returns the per-organ detail df (with condition tag)."""
     print(f"\n{'#'*80}\n# CONDITION: {cond.tag}\n{'#'*80}")
 
@@ -103,6 +104,7 @@ def run_condition(cond: C.Condition,
         ref_phase=ref_phase,
         erosion_mm=erosion_mm,
         out_csv=None,                      # we save ourselves below
+        workers=workers,
     )
     if df is None or df.empty:
         print(f"  no organ results for {cond.tag} — check postfixes.")
@@ -182,6 +184,8 @@ def main():
     p.add_argument("--labels_csv", default=str(C.LABELS_CSV))
     p.add_argument("--ref_phase",  default=C.REF_PHASE)
     p.add_argument("--erosion_mm", type=float, default=C.EROSION_MM)
+    p.add_argument("--workers", type=int, default=1,
+                   help="Parallel worker processes per condition (default: 1)")
     args = p.parse_args()
 
     tags = args.conditions or list(C.CONDITIONS)
@@ -195,7 +199,8 @@ def main():
     detail_by_cond: Dict[str, pd.DataFrame] = {}
     for tag in tags:
         df = run_condition(C.CONDITIONS[tag], labels_df,
-                           args.labels_csv, args.ref_phase, args.erosion_mm)
+                           args.labels_csv, args.ref_phase, args.erosion_mm,
+                           workers=args.workers)
         if df is not None:
             detail_by_cond[tag] = df
 

@@ -38,7 +38,7 @@ from typing import Dict, Optional
 try:
     from configs import MAIN_PATH                      # type: ignore
 except Exception:                                       # pragma: no cover
-    MAIN_PATH = os.environ.get("MAIN_PATH", "/data/")
+    MAIN_PATH = os.environ.get("MAIN_PATH", "../ncct_cect/vindr_ds/")
 if not MAIN_PATH.endswith("/"):
     MAIN_PATH += "/"
 
@@ -48,7 +48,7 @@ MAIN = Path(MAIN_PATH)
 BASELINE_CROP_DIR  = MAIN / "baseline_volumes"                 # A1: crop only
 ALIGNED_CROP_DIR   = MAIN / "aligned_volumes"                  # A2: + z-align
 RIGID_ALIGNED_DIR  = MAIN / "fixed_aligned_rigid_registered"   # A3/A4/A5
-RESULTS_DIR        = MAIN / "experiments" / "results"          # A6 + all baselines
+RESULTS_DIR        = MAIN / "all_baseline_algorithms"         # A6 + all baselines
 
 LABELS_CSV = MAIN / "labels.csv"
 REF_PHASE  = "Non-contrast"
@@ -68,11 +68,17 @@ class InputSource:
 # already doing with register_fixed.py (running it on both aligned + baseline).
 #   aligned  = z-aligned crops  (the full pipeline path; algos replace A3-A6)
 #   baseline = crop-only        (no z-align; isolates the z-align contribution)
+RAW_VOL_DIR = MAIN / "nifti_unprocessed_volumes"   # DICOM→NIfTI, no crop/align
+
 INPUTS: Dict[str, InputSource] = {
     "aligned":  InputSource("aligned",  ALIGNED_CROP_DIR,
                             "_aligned.nii.gz",  "_aligned_seg_reg.nii.gz"),
     "baseline": InputSource("baseline", BASELINE_CROP_DIR,
                             "_baseline.nii.gz", "_baseline_seg_reg.nii.gz"),
+    # raw: standardized NIfTIs with NO cropping and NO z-alignment.
+    # Running the pipeline on this input isolates the contribution of A1+A2.
+    "raw":      InputSource("raw",      RAW_VOL_DIR,
+                            "_standardized.nii.gz", "_standardized_seg_reg.nii.gz"),
 }
 
 
@@ -163,6 +169,9 @@ BASELINE_ALGOS: Dict[str, BaselineAlgo] = {a.tag: a for a in [
                  "_ants.nii.gz",   "_ants_seg_reg.nii.gz",   True, "_ants_dvf.nii.gz"),
     BaselineAlgo("B4_vxm",   "VoxelMorph",
                  "_vxm.nii.gz",    "_vxm_seg_reg.nii.gz",    True, "_vxm_dvf.nii.gz"),
+    BaselineAlgo("B5_unigradicon", "uniGradICON",
+                 "_unigradicon.nii.gz", "_unigradicon_seg_reg.nii.gz",
+                 True, "_unigradicon_dvf.nii.gz"),
 ]}
 
 

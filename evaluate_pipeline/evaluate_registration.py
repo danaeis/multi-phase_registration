@@ -94,27 +94,9 @@ def mean_surface_distance_mm(mask_fixed, mask_moving, spacing_zyx):
 def erode_mask(binary_mask: np.ndarray,
                spacing_mm: Tuple[float, float, float],
                erosion_mm: float = 6.0) -> np.ndarray:
-    """
-    Erode a binary mask by erosion_mm in physical space.
-
-    Args:
-        binary_mask : (Z, Y, X) bool/uint8 array
-        spacing_mm  : (z, y, x) voxel spacing in mm  [note: numpy Z-first]
-        erosion_mm  : erosion radius in mm
-
-    Returns:
-        Eroded binary mask as uint8.
-    """
-    # Convert to sitk for accurate mm-based morphology
-    mask_sitk = sitk.GetImageFromArray(binary_mask.astype(np.uint8))
-    # sitk spacing is (x, y, z) — reverse of numpy
-    mask_sitk.SetSpacing(tuple(reversed(spacing_mm)))
-
-    radius_vox = [max(1, int(round(erosion_mm / s)))
-                  for s in mask_sitk.GetSpacing()]
-
-    eroded = sitk.BinaryErode(mask_sitk, radius_vox)
-    return sitk.GetArrayFromImage(eroded).astype(np.uint8)
+    """Euclidean erosion in physical space via distance transform (fast, mm-accurate)."""
+    dist = distance_transform_edt(binary_mask.astype(bool), sampling=spacing_mm)
+    return (dist >= erosion_mm).astype(np.uint8)
 
 
 def get_spacing_zyx(sitk_img: sitk.Image) -> Tuple[float, float, float]:
@@ -171,6 +153,22 @@ def ncc_within_mask(vol_fixed: np.ndarray,
     if f_std < 1e-6 or m_std < 1e-6:
         return None
 
+    return float(np.mean((f / f_std) * (m / m_std)))
+
+
+def _ncc_on_mask(vol_fixed: np.ndarray,
+                 vol_moving: np.ndarray,
+                 eroded_mask: np.ndarray) -> Optional[float]:
+    """NCC within a pre-eroded mask region (avoids re-eroding the same mask)."""
+    if eroded_mask.sum() < 100:
+        return None
+    region = eroded_mask.astype(bool)
+    f = vol_fixed[region].astype(np.float64)
+    m = vol_moving[region].astype(np.float64)
+    f -= f.mean(); f_std = f.std()
+    m -= m.mean(); m_std = m.std()
+    if f_std < 1e-6 or m_std < 1e-6:
+        return None
     return float(np.mean((f / f_std) * (m / m_std)))
 
 
@@ -390,27 +388,25 @@ def evaluate_organ_pair(
     mask_f = (seg_fixed_np  == label).astype(np.uint8)
     mask_m = (seg_moving_np == label).astype(np.uint8)
 
-    # Require at least 200 voxels in both masks to be meaningful
     if mask_f.sum() < 200 or mask_m.sum() < 200:
         return None
 
-    dice = eroded_dice(mask_f, mask_m, spacing_zyx, erosion_mm)
+    # Erode once per mask — reused for Dice, NCC, and Sobel-NCC (was 3× for fixed mask)
+    ef = erode_mask(mask_f, spacing_zyx, erosion_mm)
+    em = erode_mask(mask_m, spacing_zyx, erosion_mm)
+
+    if ef.sum() == 0 or em.sum() == 0:
+        dice = None
+    else:
+        dice = 2.0 * int((ef & em).sum()) / (int(ef.sum()) + int(em.sum()))
 
     hd95 = hd95_mm(mask_f, mask_m, spacing_zyx)
 
-    # |∇HU|-NCC: use precomputed gradient volumes when available
-    if grad_fixed_np is not None and grad_moving_np is not None:
-        sncc = ncc_within_mask(grad_fixed_np, grad_moving_np,
-                               mask_f, spacing_zyx, erosion_mm)
-    else:
-        sncc = sobel_ncc(vol_fixed_np, vol_moving_np,
-                         mask_f, spacing_zyx, erosion_mm)
+    gf = grad_fixed_np if grad_fixed_np is not None else grad_magnitude(vol_fixed_np)
+    gm = grad_moving_np if grad_moving_np is not None else grad_magnitude(vol_moving_np)
+    sncc = _ncc_on_mask(gf, gm, ef)
 
-    ncc = None
-    if label in NCC_ORGANS:
-        ncc = ncc_within_mask(
-            vol_fixed_np, vol_moving_np, mask_f, spacing_zyx, erosion_mm
-        )
+    ncc = _ncc_on_mask(vol_fixed_np, vol_moving_np, ef) if label in NCC_ORGANS else None
 
     centroid = centroid_displacement_mm(mask_f, mask_m, spacing_zyx)
 
@@ -420,7 +416,7 @@ def evaluate_organ_pair(
         "eroded_dice":  dice,
         "hd95_mm":      hd95,
         "sobel_ncc":    sncc,
-        "ncc":          ncc,          # legacy intensity NCC (excluded from summary)
+        "ncc":          ncc,
         "centroid_mm":  centroid,
     }
 
@@ -568,6 +564,7 @@ def evaluate_all(
         erosion_mm: float = 6.0,
         out_csv: Optional[str] = None,
         organ_labels: Dict[int, str] = ORGAN_LABELS,
+        workers: int = 1,
 ) -> pd.DataFrame:
     """
     Run evaluation over all study subdirectories in base_dir.
@@ -599,31 +596,56 @@ def evaluate_all(
     print(f"  ref_phase   : {ref_phase}")
     print(f"  erosion_mm  : {erosion_mm}")
     print(f"  studies     : {len(study_dirs)}")
+    print(f"  workers     : {workers}")
     print(f"{'='*80}")
 
     all_results: List[dict] = []
 
-    for idx, study_id in enumerate(study_dirs, 1):
-        study_dir = os.path.join(base_dir, study_id)
-        print(f"\n[{idx}/{len(study_dirs)}] {study_id[:55]}...")
+    if workers > 1:
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            futs = {
+                pool.submit(
+                    evaluate_study,
+                    sid,
+                    os.path.join(base_dir, sid),
+                    labels_df, seg_postfix, vol_postfix,
+                    ref_phase, erosion_mm, organ_labels,
+                ): (i, sid)
+                for i, sid in enumerate(study_dirs, 1)
+            }
+            for fut in as_completed(futs):
+                i, sid = futs[fut]
+                try:
+                    rows = fut.result()
+                    all_results.extend(rows)
+                    print(f"  [{i}/{len(study_dirs)}] {sid[:55]}... ✓ {len(rows)} pairs")
+                except Exception as e:
+                    import traceback
+                    print(f"  [{i}/{len(study_dirs)}] ✗ {sid[:40]}: {e}")
+                    traceback.print_exc()
+    else:
+        for idx, study_id in enumerate(study_dirs, 1):
+            study_dir = os.path.join(base_dir, study_id)
+            print(f"\n[{idx}/{len(study_dirs)}] {study_id[:55]}...")
 
-        try:
-            rows = evaluate_study(
-                study_id=study_id,
-                study_dir=study_dir,
-                labels_df=labels_df,
-                seg_postfix=seg_postfix,
-                vol_postfix=vol_postfix,
-                ref_phase=ref_phase,
-                erosion_mm=erosion_mm,
-                organ_labels=organ_labels,
-            )
-            all_results.extend(rows)
-            print(f"  ✓ {len(rows)} organ-phase pairs evaluated")
-        except Exception as e:
-            import traceback
-            print(f"  ✗ Error: {e}")
-            traceback.print_exc()
+            try:
+                rows = evaluate_study(
+                    study_id=study_id,
+                    study_dir=study_dir,
+                    labels_df=labels_df,
+                    seg_postfix=seg_postfix,
+                    vol_postfix=vol_postfix,
+                    ref_phase=ref_phase,
+                    erosion_mm=erosion_mm,
+                    organ_labels=organ_labels,
+                )
+                all_results.extend(rows)
+                print(f"  ✓ {len(rows)} organ-phase pairs evaluated")
+            except Exception as e:
+                import traceback
+                print(f"  ✗ Error: {e}")
+                traceback.print_exc()
 
     df = pd.DataFrame(all_results)
 
@@ -711,6 +733,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Erosion radius in mm before Dice/NCC (default: 6.0)")
     p.add_argument("--out_csv",    default=None,
                    help="Path to save results CSV (optional)")
+    p.add_argument("--workers", type=int, default=1,
+                   help="Parallel worker processes for study evaluation (default: 1)")
 
     return p
 
@@ -729,6 +753,7 @@ if __name__ == "__main__":
             ref_phase=args.ref_phase,
             erosion_mm=args.erosion_mm,
             out_csv=args.out_csv,
+            workers=args.workers,
         )
 
     else:

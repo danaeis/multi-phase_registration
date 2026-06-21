@@ -21,7 +21,7 @@ Usage:
     python run_ants.py --input aligned --studies STUDY_ID
 """
 from __future__ import annotations
-import os, sys, tempfile
+import os, sys, tempfile, time
 from pathlib import Path
 import numpy as np
 import SimpleITK as sitk
@@ -29,12 +29,12 @@ import SimpleITK as sitk
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent))
 try:
-    from . import _common as K
+    from ..registration import _common as K
 except ImportError:
     import _common as K
 
-import config as C
-import evaluate_registration as E
+import compare_config as C
+import evaluate_pipeline.evaluate_registration as E
 
 ALGO_TAG = "B3_ants"
 
@@ -68,6 +68,7 @@ def register_ants(fixed: sitk.Image, moving: sitk.Image,
         mo_seg = ants.image_read(s_path)
 
         print("    running ANTs SyN (MI metric)...", flush=True)
+        _t0 = time.perf_counter()
         reg = ants.registration(
             fixed=fi, moving=mo,
             type_of_transform="SyN",
@@ -75,8 +76,9 @@ def register_ants(fixed: sitk.Image, moving: sitk.Image,
             syn_metric="mattes",
             verbose=False,
         )
+        _ants_sec = time.perf_counter() - _t0
         fwd = reg["fwdtransforms"]    # list: [warp.nii.gz, affine.mat]
-        print(f"    SyN done, applying transforms...", flush=True)
+        print(f"    ANTs SyN wall time: {_ants_sec:.1f}s", flush=True)
 
         # Warp volume (linear interpolation)
         warped_ants = reg["warpedmovout"]
