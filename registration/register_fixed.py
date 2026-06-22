@@ -1020,7 +1020,7 @@ def register_study(
                 mov_seg_reg_pass1 = _apply_seg(mov_seg_reg, nc_img, tx0)
                 err1 = err0_centroid
                 
-            # ── Pass 2 — gradient-magnitude edge polish ────────────────────
+            # # ── Pass 2 — gradient-magnitude edge polish ────────────────────
             print(f"\n  Pass 2 — gradient-edge polish (phase-invariant)...")
 
             # FIX 10: moving mask = fixed mask resampled into moving space + 10mm dilation
