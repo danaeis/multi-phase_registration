@@ -1,0 +1,148 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand*\HyPL@Entry[1]{}
+\citation{forner2018}
+\citation{easl2018}
+\citation{pluim2003}
+\citation{metz2011,klein2010}
+\citation{klein2010}
+\citation{avants2008}
+\citation{xu2019,hu2018}
+\HyPL@Entry{0<</S/D>>}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\newlabel{sec:intro}{{1}{1}{Introduction}{section.1}{}}
+\citation{kabsch1976}
+\citation{thirion1998}
+\citation{rueckert1999}
+\citation{klein2010}
+\citation{avants2008}
+\citation{wells1996}
+\citation{mattes2001}
+\citation{pluim2003}
+\citation{metz2011}
+\citation{heinrich2013}
+\citation{hering2022}
+\citation{balakrishnan2019}
+\citation{chen2022}
+\citation{mok2020}
+\citation{hoopes2021}
+\citation{tian2023}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Related Work}{2}{section.2}\protected@file@percent }
+\newlabel{sec:related}{{2}{2}{Related Work}{section.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Classical Multi-Phase CT Registration}{2}{subsection.2.1}\protected@file@percent }
+\newlabel{sec:related_classical}{{2.1}{2}{Classical Multi-Phase CT Registration}{subsection.2.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Learning-Based Abdominal Registration}{2}{subsection.2.2}\protected@file@percent }
+\newlabel{sec:related_dl}{{2.2}{2}{Learning-Based Abdominal Registration}{subsection.2.2}{}}
+\citation{xu2019,hu2018}
+\citation{oktay2017}
+\citation{heinrich2012}
+\citation{klein2010}
+\citation{papiez2014}
+\citation{devos2019}
+\citation{vindr}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Anatomy-Constrained and Masked Registration}{3}{subsection.2.3}\protected@file@percent }
+\newlabel{sec:related_masked}{{2.3}{3}{Anatomy-Constrained and Masked Registration}{subsection.2.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Overview of the proposed multi-phase CT registration pipeline. The NC phase is the fixed reference throughout. Four mask tiers derived from a single TotalSegmentator pass serve distinct roles at each stage.}}{3}{figure.caption.2}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:pipeline}{{1}{3}{Overview of the proposed multi-phase CT registration pipeline. The NC phase is the fixed reference throughout. Four mask tiers derived from a single TotalSegmentator pass serve distinct roles at each stage}{figure.caption.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Dataset}{3}{section.3}\protected@file@percent }
+\newlabel{sec:dataset}{{3}{3}{Dataset}{section.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Method}{3}{section.4}\protected@file@percent }
+\newlabel{sec:method}{{4}{3}{Method}{section.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Preprocessing and Standardisation}{3}{subsection.4.1}\protected@file@percent }
+\newlabel{sec:preproc}{{4.1}{3}{Preprocessing and Standardisation}{subsection.4.1}{}}
+\citation{wasserthal2023}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Organ Segmentation and Four-Tier Mask Construction}{4}{subsection.4.2}\protected@file@percent }
+\newlabel{sec:seg}{{4.2}{4}{Organ Segmentation and Four-Tier Mask Construction}{subsection.4.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Confidence-Gated Z-Alignment}{4}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:zalign}{{4.3}{4}{Confidence-Gated Z-Alignment}{subsection.4.3}{}}
+\@writefile{toc}{\contentsline {paragraph}{Centroid offset estimation.}{4}{section*.3}\protected@file@percent }
+\newlabel{eq:zoffset}{{1}{4}{Centroid offset estimation}{equation.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{Confidence score and gating.}{4}{section*.4}\protected@file@percent }
+\citation{kabsch1976}
+\citation{nelder1965}
+\citation{rueckert1999}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Three-Pass Organ-Masked Rigid Registration}{5}{subsection.4.4}\protected@file@percent }
+\newlabel{sec:rigid}{{4.4}{5}{Three-Pass Organ-Masked Rigid Registration}{subsection.4.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{Pass~0: Kabsch SVD bone initialisation.}{5}{section*.5}\protected@file@percent }
+\newlabel{eq:kabsch}{{2}{5}{Pass~0: Kabsch SVD bone initialisation}{equation.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{Pass~1: Nelder-Mead centroid + eroded-Dice refinement.}{5}{section*.6}\protected@file@percent }
+\newlabel{eq:pass1loss}{{3}{5}{Pass~1: Nelder-Mead centroid + eroded-Dice refinement}{equation.3}{}}
+\@writefile{toc}{\contentsline {paragraph}{Pass~2: Sobel-gradient NCC polish with acceptance gate.}{5}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}B-Spline Deformable Registration}{5}{subsection.4.5}\protected@file@percent }
+\newlabel{sec:deformable}{{4.5}{5}{B-Spline Deformable Registration}{subsection.4.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Evaluation Protocol}{5}{section.5}\protected@file@percent }
+\newlabel{sec:eval}{{5}{5}{Evaluation Protocol}{section.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Metrics}{5}{subsection.5.1}\protected@file@percent }
+\newlabel{eq:dice}{{4}{5}{Metrics}{equation.4}{}}
+\newlabel{eq:centroid}{{5}{5}{Metrics}{equation.5}{}}
+\citation{pluim2003}
+\citation{avants2008}
+\citation{klein2010}
+\citation{heinrich2013}
+\citation{balakrishnan2019}
+\citation{lowekamp2013}
+\citation{wasserthal2023}
+\citation{avants2008}
+\citation{klein2010}
+\citation{heinrich2013}
+\citation{balakrishnan2019}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Organ Groups}{6}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Evaluated Conditions}{6}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Experiments and Results}{6}{section.6}\protected@file@percent }
+\newlabel{sec:results}{{6}{6}{Experiments and Results}{section.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Implementation Details}{6}{subsection.6.1}\protected@file@percent }
+\newlabel{sec:impl}{{6.1}{6}{Implementation Details}{subsection.6.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Pipeline Stage Ablation}{6}{subsection.6.2}\protected@file@percent }
+\newlabel{sec:ablation}{{6.2}{6}{Pipeline Stage Ablation}{subsection.6.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Similarity Metric Ablation}{6}{subsection.6.3}\protected@file@percent }
+\newlabel{sec:metric_ablation}{{6.3}{6}{Similarity Metric Ablation}{subsection.6.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Comparison with Existing Methods}{6}{subsection.6.4}\protected@file@percent }
+\newlabel{sec:comparison}{{6.4}{6}{Comparison with Existing Methods}{subsection.6.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.5}Qualitative Results}{6}{subsection.6.5}\protected@file@percent }
+\newlabel{sec:qual}{{6.5}{6}{Qualitative Results}{subsection.6.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Discussion}{6}{section.7}\protected@file@percent }
+\newlabel{sec:discussion}{{7}{6}{Discussion}{section.7}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Registration quality at each pipeline stage. Eroded Dice (higher is better) and centroid displacement in mm (lower is better), reported as median\,$\pm $\,IQR across \textcolor {teal}{[N]} studies per phase. NC is the fixed reference. \textcolor {orange}{\textbf  {---}}{} = result pending. }}{7}{table.caption.8}\protected@file@percent }
+\newlabel{tab:ablation}{{1}{7}{Registration quality at each pipeline stage. Eroded Dice (higher is better) and centroid displacement in mm (lower is better), reported as median\,$\pm $\,IQR across \NUM {N} studies per phase. NC is the fixed reference. \BLANK {} = result pending}{table.caption.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Qualitative registration results for a representative study (axial mid-liver slice). NC fixed phase shown in green, arterial moving phase in magenta. Misalignment appears as colour fringing; correct alignment produces a grey overlay.}}{7}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:qual}{{2}{7}{Qualitative registration results for a representative study (axial mid-liver slice). NC fixed phase shown in green, arterial moving phase in magenta. Misalignment appears as colour fringing; correct alignment produces a grey overlay}{figure.caption.11}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Effect of similarity metric and masking on deformable registration quality. All conditions use identical pipeline stages and hyperparameters. Median eroded Dice / centroid displacement (mm). \textcolor {orange}{\textbf  {---}}{} = result pending. }}{7}{table.caption.9}\protected@file@percent }
+\newlabel{tab:metric}{{2}{7}{Effect of similarity metric and masking on deformable registration quality. All conditions use identical pipeline stages and hyperparameters. Median eroded Dice / centroid displacement (mm). \BLANK {} = result pending}{table.caption.9}{}}
+\bibstyle{IEEEtran}
+\bibcite{rueckert1999}{1}
+\bibcite{thirion1998}{2}
+\bibcite{avants2008}{3}
+\bibcite{klein2010}{4}
+\bibcite{mattes2001}{5}
+\bibcite{wells1996}{6}
+\bibcite{pluim2003}{7}
+\bibcite{studholme1999}{8}
+\bibcite{metz2011}{9}
+\bibcite{heinrich2013}{10}
+\bibcite{hering2022}{11}
+\bibcite{murphy2011}{12}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Comparison against existing registration methods at the deformable/non-rigid stage on \textcolor {teal}{[265]} studies. CD = centroid displacement (mm). Time = mean wall-clock seconds per study (CPU unless noted). \textbf  {Bold} = best per column. \textcolor {orange}{\textbf  {---}}{} = result pending. }}{8}{table.caption.10}\protected@file@percent }
+\newlabel{tab:comparison}{{3}{8}{Comparison against existing registration methods at the deformable/non-rigid stage on \NUM {265} studies. CD = centroid displacement (mm). Time = mean wall-clock seconds per study (CPU unless noted). \textbf {Bold} = best per column. \BLANK {} = result pending}{table.caption.10}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {8}Conclusion}{8}{section.8}\protected@file@percent }
+\newlabel{sec:conclusion}{{8}{8}{Conclusion}{section.8}{}}
+\bibcite{balakrishnan2019}{13}
+\bibcite{chen2022}{14}
+\bibcite{mok2020}{15}
+\bibcite{hoopes2021}{16}
+\bibcite{tian2023}{17}
+\bibcite{zhao2019}{18}
+\bibcite{xu2019}{19}
+\bibcite{hu2018}{20}
+\bibcite{oktay2017}{21}
+\bibcite{heinrich2012}{22}
+\bibcite{papiez2014}{23}
+\bibcite{devos2019}{24}
+\bibcite{wasserthal2023}{25}
+\bibcite{lowekamp2013}{26}
+\bibcite{kabsch1976}{27}
+\bibcite{nelder1965}{28}
+\bibcite{forner2018}{29}
+\bibcite{easl2018}{30}
+\bibcite{vindr}{31}
+\gdef \@abspage@last{9}
