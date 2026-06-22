@@ -45,10 +45,11 @@ if not MAIN_PATH.endswith("/"):
 MAIN = Path(MAIN_PATH)
 
 # Stage directories (mirror register_fixed.py / align_data_v3.py constants)
-BASELINE_CROP_DIR  = MAIN / "baseline_volumes"                 # A1: crop only
-ALIGNED_CROP_DIR   = MAIN / "aligned_volumes"                  # A2: + z-align
-RIGID_ALIGNED_DIR  = MAIN / "fixed_aligned_rigid_registered"   # A3/A4/A5
-RESULTS_DIR        = MAIN / "all_baseline_algorithms"         # A6 + all baselines
+BASELINE_CROP_DIR   = MAIN / "baseline_volumes"                  # A1: crop only
+ALIGNED_CROP_DIR    = MAIN / "aligned_volumes"                   # A2: + z-align
+RIGID_ALIGNED_DIR   = MAIN / "fixed_aligned_rigid_registered"    # A3/A4/A5
+RIGID_BASELINE_DIR  = MAIN / "fixed_baseline_rigid_registered"   # A3b/A4b/A5b
+RESULTS_DIR         = MAIN / "all_baseline_algorithms"           # A6 + all baselines
 
 LABELS_CSV = MAIN / "labels.csv"
 REF_PHASE  = "Non-contrast"
@@ -116,12 +117,19 @@ def _C(tag, base, vp, sp, deformable=False, dvf=None, input_key=None) -> Conditi
 # (register_fixed.py already emits _rigid0/_rigid1/_rigid2). A6 reads results/.
 # ---------------------------------------------------------------------------
 _A_SERIES = [
+    # ── Aligned pipeline (full path) ──────────────────────────────────────
     _C("A1_crop_only",  BASELINE_CROP_DIR,  "_baseline.nii.gz",  "_baseline_seg_reg.nii.gz"),
     _C("A2_zalign",     ALIGNED_CROP_DIR,   "_aligned.nii.gz",   "_aligned_seg_reg.nii.gz"),
     _C("A3_pass0",      RIGID_ALIGNED_DIR,  "_rigid0.nii.gz",    "_rigid0_seg_reg.nii.gz"),
     _C("A4_pass01",     RIGID_ALIGNED_DIR,  "_rigid1.nii.gz",    "_rigid1_seg_reg.nii.gz"),
     _C("A5_pass012",    RIGID_ALIGNED_DIR,  "_rigid2.nii.gz",    "_rigid2_seg_reg.nii.gz"),
     _C("A6_bspline",    RESULTS_DIR / "A6_bspline", "_bspline.nii.gz",
+        "_bspline_seg_reg.nii.gz", deformable=True, dvf="_bspline_dvf.nii.gz"),
+    # ── Baseline pipeline (crop only, no z-align) — isolates z-align contribution
+    _C("A3b_pass0_noalign",   RIGID_BASELINE_DIR, "_rigid0.nii.gz", "_rigid0_seg_reg.nii.gz"),
+    _C("A4b_pass01_noalign",  RIGID_BASELINE_DIR, "_rigid1.nii.gz", "_rigid1_seg_reg.nii.gz"),
+    _C("A5b_pass012_noalign", RIGID_BASELINE_DIR, "_rigid2.nii.gz", "_rigid2_seg_reg.nii.gz"),
+    _C("A6_bspline_baseline", RESULTS_DIR / "A6_bspline_baseline", "_bspline.nii.gz",
         "_bspline_seg_reg.nii.gz", deformable=True, dvf="_bspline_dvf.nii.gz"),
 ]
 
@@ -205,12 +213,18 @@ CONDITIONS: Dict[str, Condition] = {
 
 # Pretty labels for the final table
 ROW_LABELS: Dict[str, str] = {
-    "A1_crop_only": "A1  Crop only",
-    "A2_zalign":    "A2  + Z-align",
-    "A3_pass0":     "A3  + Rigid P0 (Kabsch)",
-    "A4_pass01":    "A4  + Rigid P0+1 (Nelder-Mead)",
-    "A5_pass012":   "A5  + Rigid P0+1+2 (Sobel gate)",
-    "A6_bspline":   "A6  Full (+ B-spline)",
+    # Aligned pipeline
+    "A1_crop_only":          "A1   Crop only",
+    "A2_zalign":             "A2   + Z-align",
+    "A3_pass0":              "A3   + Rigid P0 (Kabsch)",
+    "A4_pass01":             "A4   + Rigid P0+1 (Nelder-Mead)",
+    "A5_pass012":            "A5   + Rigid P0+1+2 (Sobel gate)",
+    "A6_bspline":            "A6   Full (+ B-spline)",
+    # Baseline pipeline — no z-align (isolates z-align contribution)
+    "A3b_pass0_noalign":     "A3b  Rigid P0        [no z-align]",
+    "A4b_pass01_noalign":    "A4b  Rigid P0+1      [no z-align]",
+    "A5b_pass012_noalign":   "A5b  Rigid P0+1+2    [no z-align]",
+    "A6_bspline_baseline":   "A6b  Full deformable [no z-align]",
 }
 for _algo in BASELINE_ALGOS.values():
     for _ikey in INPUTS:

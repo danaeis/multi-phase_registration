@@ -1,36 +1,27 @@
 """
 prepare_a6_bspline.py
 =====================
-Populate the compare_config A6_bspline condition directory from an existing
-deformable_registration_v2.py output directory.
+Populate the compare_config A6_bspline (or A6_bspline_baseline) condition
+directory from an existing deformable_registration_v2.py output directory,
+using hardlinks (zero extra disk space; falls back to copy on cross-device).
 
 deformable_registration_v2.py writes:
-    MAIN/deformable_registered_{metric}/{study}/{study}_{series}_deformable.nii.gz
-    MAIN/deformable_registered_{metric}/{study}/{study}_{series}_deformable_seg_reg.nii.gz
-    MAIN/deformable_registered_{metric}/{study}/{study}_{series}_deformable_dvf.nii.gz
+    MAIN/deformable_registered_{metric}/           (aligned, default)
+    MAIN/deformable_registered_{metric}_baseline/  (with --baseline)
+  with postfixes: _deformable.nii.gz  _deformable_seg_reg.nii.gz  _deformable_dvf.nii.gz
 
-compare_config.py A6_bspline expects:
-    MAIN/all_baseline_algorithms/A6_bspline/{study}/{study}_{series}_bspline.nii.gz
-    MAIN/all_baseline_algorithms/A6_bspline/{study}/{study}_{series}_bspline_seg_reg.nii.gz
-    MAIN/all_baseline_algorithms/A6_bspline/{study}/{study}_{series}_bspline_dvf.nii.gz
-
-This script creates hardlinks (zero extra disk space; falls back to copy on
-cross-device mount) so evaluate_compare_conditions.py can evaluate A6_bspline
-without re-running registration.
+compare_config.py expects:
+    A6_bspline          → all_baseline_algorithms/A6_bspline/
+    A6_bspline_baseline → all_baseline_algorithms/A6_bspline_baseline/
+  with postfixes: _bspline.nii.gz  _bspline_seg_reg.nii.gz  _bspline_dvf.nii.gz
 
 Usage
 -----
-# Use sobel_ncc (default — best metric per deformable ablation):
-python prepare_a6_bspline.py
-
-# Use a different metric:
+python prepare_a6_bspline.py                   # aligned, sobel_ncc
+python prepare_a6_bspline.py --baseline        # baseline (no z-align), sobel_ncc
 python prepare_a6_bspline.py --metric grad_ncc
-
-# Overwrite any existing targets:
-python prepare_a6_bspline.py --force
-
-# Dry run — show what would be linked without touching the filesystem:
-python prepare_a6_bspline.py --dry-run
+python prepare_a6_bspline.py --force           # overwrite existing targets
+python prepare_a6_bspline.py --dry-run         # show what would be linked
 """
 from __future__ import annotations
 
@@ -44,7 +35,7 @@ _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
 import compare_config as C
 
-# deformable_registration_v2.py postfixes
+# deformable_registration_v2.py output postfixes → compare_config expected postfixes
 SRC_POSTFIXES = {
     "_deformable.nii.gz":         "_bspline.nii.gz",
     "_deformable_seg_reg.nii.gz": "_bspline_seg_reg.nii.gz",
@@ -65,36 +56,31 @@ def link_or_copy(src: Path, dst: Path, dry_run: bool) -> str:
         return "copy"
 
 
-def main() -> None:
-    p = argparse.ArgumentParser(
-        description="Link/copy deformable_registered_{metric} → A6_bspline location."
-    )
-    p.add_argument("--metric", default=DEFAULT_METRIC,
-                   help=f"Deformable metric to use (default: {DEFAULT_METRIC}).")
-    p.add_argument("--force",   action="store_true",
-                   help="Overwrite existing targets.")
-    p.add_argument("--dry-run", action="store_true",
-                   help="Show what would be done without touching disk.")
-    args = p.parse_args()
+def prepare(metric: str, baseline: bool, force: bool, dry_run: bool) -> None:
+    # Source: where deformable_registration_v2.py wrote its output
+    suffix = f"_{metric}_baseline" if baseline else f"_{metric}"
+    src_dir = C.MAIN / f"deformable_registered{suffix}"
 
-    src_dir  = C.MAIN / f"deformable_registered_{args.metric}"
-    dst_cond = C.CONDITIONS.get("A6_bspline")
+    # Destination: what compare_config CONDITIONS expect
+    cond_tag = "A6_bspline_baseline" if baseline else "A6_bspline"
+    dst_cond = C.CONDITIONS.get(cond_tag)
     if dst_cond is None:
-        raise SystemExit("A6_bspline not found in compare_config.CONDITIONS")
+        raise SystemExit(f"{cond_tag} not found in compare_config.CONDITIONS")
     dst_dir = dst_cond.base_dir
 
     if not src_dir.exists():
+        kind = "baseline" if baseline else "aligned"
         raise SystemExit(
-            f"Source directory not found: {src_dir}\n"
+            f"Source not found: {src_dir}\n"
             f"Run first:\n"
             f"  python ../registration/deformable_registration_v2.py "
-            f"--metric {args.metric} --all --skip"
+            f"--metric {metric} --all --skip"
+            + (" --baseline" if baseline else "")
         )
 
-    print(f"Source : {src_dir}")
-    print(f"Dest   : {dst_dir}")
-    print(f"Metric : {args.metric}  |  dry_run={args.dry_run}  force={args.force}")
-    print()
+    print(f"Source ({cond_tag}): {src_dir}")
+    print(f"Dest              : {dst_dir}")
+    print(f"dry_run={dry_run}  force={force}")
 
     n_ok = n_skip = n_missing = 0
 
@@ -103,8 +89,7 @@ def main() -> None:
             continue
         study = study_dir.name
         out_study = dst_dir / study
-
-        if not args.dry_run:
+        if not dry_run:
             out_study.mkdir(parents=True, exist_ok=True)
 
         for src_suf, dst_suf in SRC_POSTFIXES.items():
@@ -112,28 +97,42 @@ def main() -> None:
                 stem = src_file.name[: -len(src_suf)]
                 dst_file = out_study / f"{stem}{dst_suf}"
 
-                if dst_file.exists() and not args.force:
+                if dst_file.exists() and not force:
                     n_skip += 1
                     continue
-
                 if not src_file.exists():
                     n_missing += 1
                     continue
-
-                if dst_file.exists() and args.force and not args.dry_run:
+                if dst_file.exists() and force and not dry_run:
                     dst_file.unlink()
 
-                action = link_or_copy(src_file, dst_file, args.dry_run)
+                link_or_copy(src_file, dst_file, dry_run)
                 n_ok += 1
-                if args.dry_run:
+                if dry_run:
                     print(f"  [dry] {study}/{stem}{dst_suf}")
 
-    print(f"\nA6_bspline prepare done:")
-    print(f"  linked/copied : {n_ok}")
+    print(f"\n{cond_tag} prepare done:")
+    print(f"  linked/copied  : {n_ok}")
     print(f"  skipped (exist): {n_skip}")
-    print(f"  source missing: {n_missing}")
-    if args.dry_run:
+    print(f"  source missing : {n_missing}")
+    if dry_run:
         print("  (dry run — nothing written)")
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(
+        description="Link deformable_registered_{metric}[_baseline] → A6_bspline[_baseline]."
+    )
+    p.add_argument("--metric",   default=DEFAULT_METRIC,
+                   help=f"Deformable metric (default: {DEFAULT_METRIC}).")
+    p.add_argument("--baseline", action="store_true",
+                   help="Prepare A6_bspline_baseline from the _baseline output dir.")
+    p.add_argument("--force",    action="store_true",
+                   help="Overwrite existing target files.")
+    p.add_argument("--dry-run",  action="store_true",
+                   help="Show what would be linked without writing anything.")
+    args = p.parse_args()
+    prepare(args.metric, args.baseline, args.force, args.dry_run)
 
 
 if __name__ == "__main__":
