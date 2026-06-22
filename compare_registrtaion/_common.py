@@ -264,29 +264,33 @@ def run_baseline(algo_tag: str,
     # (seg_dir / flat / seg_postfix) — prefer those if present, and only fall
     # back to the convention below when they're absent, so this keeps working
     # if config.py is updated later.
-    is_raw = (input_key == "raw")
-    flat = getattr(src, "flat", is_raw)
-    seg_dir = getattr(src, "seg_dir", None)
-    seg_postfix = getattr(src, "seg_postfix", None)
-    if is_raw:
-        if seg_dir is None:
-            seg_dir = Path(src.dir).parent / "ts_segmentation"
-        if seg_postfix is None:
-            seg_postfix = "_seg_reg.nii.gz"
-    else:
-        if seg_dir is None:
-            seg_dir = src.dir
-        if seg_postfix is None:
-            seg_postfix = src.seg_postfix
+
+    flat     = src.flat
+    seg_dir  = src.seg_dir if src.seg_dir is not None else src.dir
+    seg_postfix = src.seg_postfix
+    # is_raw = (input_key == "raw")
+    # flat = getattr(src, "flat", is_raw)
+    # seg_dir = getattr(src, "seg_dir", None)
+    # seg_postfix = getattr(src, "seg_postfix", None)
+    # if is_raw:
+    #     if seg_dir is None:
+    #         seg_dir = Path(src.dir).parent / "ts_segmentation"
+    #     if seg_postfix is None:
+    #         seg_postfix = "_seg_reg.nii.gz"
+    # else:
+    #     if seg_dir is None:
+    #         seg_dir = src.dir
+    #     if seg_postfix is None:
+    #         seg_postfix = src.seg_postfix
 
     print(f"\n{'='*80}\n{tag}\n  input : {src.dir}\n  output: {cond.base_dir}\n{'='*80}")
-    if is_raw:
-        print(f"  (raw layout: flat vols in {src.dir}, flat segs in {seg_dir})")
-    if studies:
-        print(f"  study filter: {len(studies)} studies")
+    if flat:
+        print(f"  (flat layout: vols in {src.dir}, segs in {seg_dir})")
+    
 
     # Group pairs by study so we can time/track resources per study.
     study_pairs: dict = defaultdict(list)
+    
     for item in iter_pairs(labels_df, src.dir, src.vol_postfix, seg_postfix,
                            seg_dir=seg_dir, flat=flat):
         if studies and item["study"] not in studies:

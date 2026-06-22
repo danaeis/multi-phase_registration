@@ -45,6 +45,7 @@ if not MAIN_PATH.endswith("/"):
 MAIN = Path(MAIN_PATH)
 
 # Stage directories (mirror register_fixed.py / align_data_v3.py constants)
+RAW_VOL_DIR         = MAIN / "nifti_unprocessed_volumes"
 BASELINE_CROP_DIR   = MAIN / "baseline_volumes"                  # A1: crop only
 ALIGNED_CROP_DIR    = MAIN / "aligned_volumes"                   # A2: + z-align
 RIGID_ALIGNED_DIR   = MAIN / "fixed_aligned_rigid_registered"    # A3/A4/A5
@@ -58,28 +59,22 @@ EROSION_MM = 6.0
 
 @dataclass(frozen=True)
 class InputSource:
-    """A starting point for the comparison algorithms."""
     key:         str
     dir:         Path
     vol_postfix: str
     seg_postfix: str
-
-
-# The two starting points the baselines are run from. Mirrors what you are
-# already doing with register_fixed.py (running it on both aligned + baseline).
-#   aligned  = z-aligned crops  (the full pipeline path; algos replace A3-A6)
-#   baseline = crop-only        (no z-align; isolates the z-align contribution)
-RAW_VOL_DIR = MAIN / "nifti_unprocessed_volumes"   # DICOM→NIfTI, no crop/align
+    seg_dir:     Optional[Path] = None   # add this; None = same as dir (nested)
+    flat:        bool = False             # add this
 
 INPUTS: Dict[str, InputSource] = {
     "aligned":  InputSource("aligned",  ALIGNED_CROP_DIR,
                             "_aligned.nii.gz",  "_aligned_seg_reg.nii.gz"),
     "baseline": InputSource("baseline", BASELINE_CROP_DIR,
                             "_baseline.nii.gz", "_baseline_seg_reg.nii.gz"),
-    # raw: standardized NIfTIs with NO cropping and NO z-alignment.
-    # Running the pipeline on this input isolates the contribution of A1+A2.
     "raw":      InputSource("raw",      RAW_VOL_DIR,
-                            "_standardized.nii.gz", "_standardized_seg_reg.nii.gz"),
+                            "_standardized.nii.gz", "_seg_reg.nii.gz",
+                            seg_dir=MAIN / "ts_segmentations",   # sibling seg tree
+                            flat=True),
 }
 
 
