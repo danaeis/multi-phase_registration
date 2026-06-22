@@ -36,7 +36,8 @@ def generate_split(
     seed: int = 42,
 ) -> pd.DataFrame:
     df = pd.read_csv(labels_csv)
-    studies = df["study_id"].unique()
+    col = "StudyInstanceUID" if "StudyInstanceUID" in df.columns else "study_id"
+    studies = df[col].unique()
     rng = np.random.default_rng(seed)
     shuffled = rng.permutation(studies)
 
