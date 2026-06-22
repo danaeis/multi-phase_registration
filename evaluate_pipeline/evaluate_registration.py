@@ -565,6 +565,7 @@ def evaluate_all(
         out_csv: Optional[str] = None,
         organ_labels: Dict[int, str] = ORGAN_LABELS,
         workers: int = 1,
+        study_ids: Optional[set] = None,
 ) -> pd.DataFrame:
     """
     Run evaluation over all study subdirectories in base_dir.
@@ -578,6 +579,8 @@ def evaluate_all(
         erosion_mm  : erosion radius in mm
         out_csv     : if given, save results DataFrame here
         organ_labels: organ label dict
+        study_ids   : optional set of study IDs to restrict evaluation to;
+                      None (default) evaluates all studies in base_dir.
 
     Returns:
         DataFrame with one row per (study, phase, organ).
@@ -586,6 +589,7 @@ def evaluate_all(
     study_dirs = sorted([
         d for d in os.listdir(base_dir)
         if os.path.isdir(os.path.join(base_dir, d))
+        and (study_ids is None or d in study_ids)
     ])
 
     print(f"\n{'='*80}")
@@ -595,7 +599,8 @@ def evaluate_all(
     print(f"  vol_postfix : {vol_postfix}")
     print(f"  ref_phase   : {ref_phase}")
     print(f"  erosion_mm  : {erosion_mm}")
-    print(f"  studies     : {len(study_dirs)}")
+    print(f"  studies     : {len(study_dirs)}"
+          + (f"  (subset of {len(os.listdir(base_dir))})" if study_ids else ""))
     print(f"  workers     : {workers}")
     print(f"{'='*80}")
 

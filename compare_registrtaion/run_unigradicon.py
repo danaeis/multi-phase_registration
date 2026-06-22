@@ -252,8 +252,24 @@ if __name__ == "__main__":
     p.add_argument("--no-skip",  action="store_true",
                    help="Recompute even if output already exists.")
     p.add_argument("--io_steps", type=int, default=None,
-                   help="Instance-optimisation fine-tune steps (default: None = skip IO).")
+                   help="Instance-optimisation fine-tune steps (default: None = skip IO).\n"
+                        "After the network forward pass, run N gradient-descent steps\n"
+                        "that fine-tune the displacement field for this specific image pair\n"
+                        "using the GradICON loss. Typical value: 50 (2-5x slower, better\n"
+                        "accuracy on hard cases). Use --algo_tag B5_unigradicon_io so\n"
+                        "outputs go to a separate condition and do not overwrite the fast run.")
+    p.add_argument("--algo_tag", default=ALGO_TAG,
+                   help="Override the condition tag written to disk.\n"
+                        "Must exist in compare_config.BASELINE_ALGOS.\n"
+                        "Use 'B5_unigradicon_io' when running with --io_steps.")
     args = p.parse_args()
+
+    effective_tag = args.algo_tag
+    if effective_tag not in C.BASELINE_ALGOS:
+        raise SystemExit(
+            f"--algo_tag '{effective_tag}' not found in compare_config.BASELINE_ALGOS.\n"
+            f"Available: {list(C.BASELINE_ALGOS)}"
+        )
 
     labels_df = pd.read_csv(args.labels_csv)
 
@@ -270,13 +286,13 @@ if __name__ == "__main__":
     else:
         inputs = [args.input]
 
-    algo = C.BASELINE_ALGOS[ALGO_TAG]
+    algo = C.BASELINE_ALGOS[effective_tag]
     for ikey in inputs:
         if ikey == "baseline" and not algo.run_on_baseline:
-            print(f"  ({ALGO_TAG} not configured for baseline input — skipping)")
+            print(f"  ({effective_tag} not configured for baseline input — skipping)")
             continue
         K.run_baseline(
-            ALGO_TAG, ikey, _register_fn, labels_df,
+            effective_tag, ikey, _register_fn, labels_df,
             studies=args.studies,
             skip_existing=not args.no_skip,
         )

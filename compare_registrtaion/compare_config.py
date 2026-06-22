@@ -172,6 +172,11 @@ BASELINE_ALGOS: Dict[str, BaselineAlgo] = {a.tag: a for a in [
     BaselineAlgo("B5_unigradicon", "uniGradICON",
                  "_unigradicon.nii.gz", "_unigradicon_seg_reg.nii.gz",
                  True, "_unigradicon_dvf.nii.gz"),
+    # B5 with instance optimisation (50 gradient steps after network forward pass).
+    # Same network weights, same evaluation ruler — isolates the IO contribution.
+    BaselineAlgo("B5_unigradicon_io", "uniGradICON + IO-50",
+                 "_unigradicon_io.nii.gz", "_unigradicon_io_seg_reg.nii.gz",
+                 True, "_unigradicon_io_dvf.nii.gz"),
 ]}
 
 
