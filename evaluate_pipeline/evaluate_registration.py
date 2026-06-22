@@ -283,6 +283,77 @@ def grad_magnitude(vol_np: np.ndarray) -> np.ndarray:
     return np.sqrt(sum(sobel(v, axis=i) ** 2 for i in range(3)))
 
 
+# ---------------------------------------------------------------------------
+# MIND-SSC: Modality Independent Neighbourhood Descriptor
+# ---------------------------------------------------------------------------
+
+_MIND_OFFSETS = [
+    (1, 0, 0), (-1, 0, 0),
+    (0, 1, 0), (0, -1, 0),
+    (0, 0, 1), (0, 0, -1),
+]
+
+def mind_ssc(vol_np: np.ndarray, sigma: float = 0.5) -> np.ndarray:
+    """
+    Compute MIND-SSC descriptors for a 3-D volume.
+
+    Returns a (Z,Y,X,6) float32 array where each channel is the
+    normalised patch-distance in one of the 6 axis-aligned directions.
+    The local variance normalisation makes the descriptor approximately
+    invariant to contrast-phase differences (same anatomy, different HU).
+
+    sigma: minimum variance floor (prevents division by zero in uniform regions).
+    """
+    vol = vol_np.astype(np.float32)
+    # Local variance: mean squared difference across 6 neighbours
+    local_var = np.zeros_like(vol)
+    for oz, oy, ox in _MIND_OFFSETS:
+        diff = vol - np.roll(vol, (oz, oy, ox), axis=(0, 1, 2))
+        local_var += diff * diff
+    local_var /= 6.0
+    local_var = np.maximum(local_var, sigma ** 2)
+
+    # Per-direction normalised descriptor
+    desc = np.empty((*vol.shape, 6), dtype=np.float32)
+    for i, (oz, oy, ox) in enumerate(_MIND_OFFSETS):
+        diff = vol - np.roll(vol, (oz, oy, ox), axis=(0, 1, 2))
+        desc[..., i] = np.exp(-(diff * diff) / local_var)
+
+    return desc
+
+
+def mind_ncc_in_mask(
+    mind_fixed:  np.ndarray,
+    mind_moving: np.ndarray,
+    organ_mask:  np.ndarray,
+) -> Optional[float]:
+    """
+    MIND-SSC NCC between fixed and warped-moving volumes in the organ mask region.
+
+    mind_fixed / mind_moving : (Z,Y,X,6) descriptors from mind_ssc().
+    organ_mask : binary mask (any dtype, >0 = inside).
+
+    Returns the mean NCC across all 6 descriptor channels, or None if the
+    mask is too small.
+    """
+    if int((organ_mask > 0).sum()) < 50:
+        return None
+
+    mask_bool = organ_mask > 0
+    mf = mind_fixed[mask_bool]   # (N, 6)
+    mm = mind_moving[mask_bool]  # (N, 6)
+
+    nccs = []
+    for d in range(6):
+        f, m = mf[:, d].astype(np.float64), mm[:, d].astype(np.float64)
+        f_std, m_std = f.std(), m.std()
+        if f_std < 1e-6 or m_std < 1e-6:
+            continue
+        nccs.append(float(np.mean((f - f.mean()) / f_std * ((m - m.mean()) / m_std))))
+
+    return float(np.mean(nccs)) if nccs else None
+
+
 def neg_jacobian_pct(dvf_path: str,
                      displacement_in_mm: bool = True,
                      body_mask: Optional[np.ndarray] = None) -> Optional[float]:
@@ -375,13 +446,14 @@ def evaluate_organ_pair(
         erosion_mm: float,
         grad_fixed_np: Optional[np.ndarray] = None,
         grad_moving_np: Optional[np.ndarray] = None,
+        mind_fixed_np: Optional[np.ndarray] = None,
+        mind_moving_np: Optional[np.ndarray] = None,
 ) -> Optional[dict]:
     """
     Compute all per-organ metrics for one organ label.
 
-    grad_fixed_np / grad_moving_np : optional precomputed |∇HU| volumes
-        (whole-volume gradient magnitude). If provided, the Sobel-NCC is
-        computed from them instead of re-running sobel() per organ.
+    grad_fixed_np / grad_moving_np : optional precomputed |∇HU| (Z,Y,X).
+    mind_fixed_np / mind_moving_np : optional precomputed MIND-SSC (Z,Y,X,6).
 
     Returns None if the organ is absent in either mask (skip silently).
     """
@@ -391,7 +463,7 @@ def evaluate_organ_pair(
     if mask_f.sum() < 200 or mask_m.sum() < 200:
         return None
 
-    # Erode once per mask — reused for Dice, NCC, and Sobel-NCC (was 3× for fixed mask)
+    # Erode once per mask — reused for Dice, NCC, Sobel-NCC, and MIND-NCC
     ef = erode_mask(mask_f, spacing_zyx, erosion_mm)
     em = erode_mask(mask_m, spacing_zyx, erosion_mm)
 
@@ -410,6 +482,11 @@ def evaluate_organ_pair(
 
     centroid = centroid_displacement_mm(mask_f, mask_m, spacing_zyx)
 
+    # MIND-SSC NCC within eroded organ mask
+    mncc = None
+    if mind_fixed_np is not None and mind_moving_np is not None:
+        mncc = mind_ncc_in_mask(mind_fixed_np, mind_moving_np, ef)
+
     return {
         "label":        label,
         "organ":        organ_name,
@@ -417,6 +494,7 @@ def evaluate_organ_pair(
         "hd95_mm":      hd95,
         "sobel_ncc":    sncc,
         "ncc":          ncc,
+        "mind_ncc":     mncc,
         "centroid_mm":  centroid,
     }
 
@@ -495,6 +573,7 @@ def evaluate_study(
     ref_vol_np   = sitk.GetArrayFromImage(ref_vol_sitk).astype(np.float32)
     spacing_zyx  = get_spacing_zyx(ref_vol_sitk)
     ref_grad_np  = grad_magnitude(ref_vol_np)   # |∇HU| of fixed, reused per organ
+    ref_mind_np  = mind_ssc(ref_vol_np)         # MIND-SSC of fixed, reused per organ
 
     # ── Evaluate each moving phase ────────────────────────────────────────
     for _, row in study_rows.iterrows():
@@ -528,6 +607,7 @@ def evaluate_study(
         print(f"  Evaluating [{phase}]...")
 
         mov_grad_np = grad_magnitude(mov_vol_np)   # |∇HU| of this moving phase
+        mov_mind_np = mind_ssc(mov_vol_np)         # MIND-SSC of this moving phase
 
         for label, organ_name in organ_labels.items():
             res = evaluate_organ_pair(
@@ -537,6 +617,8 @@ def evaluate_study(
                 spacing_zyx, erosion_mm,
                 grad_fixed_np=ref_grad_np,
                 grad_moving_np=mov_grad_np,
+                mind_fixed_np=ref_mind_np,
+                mind_moving_np=mov_mind_np,
             )
             if res is None:
                 continue

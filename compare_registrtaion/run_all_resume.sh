@@ -205,6 +205,26 @@ job_a_series_baseline() {
 
 # ── B-series: all independent, each has its own watcher ──────────────────────
 
+job_rigid_variants() {
+    hdr "R_organ / R_sobel / R_full / R_mmi  (4 rigid objectives, aligned, test split)"
+
+    local sentinel="$LOG_DIR/.rigid_variants_done"
+    rm -f "$sentinel"
+
+    local w; w=$(start_watcher "$sentinel" "$LOG_DIR/rigid_variants_eval.log" \
+        R_organ__aligned R_sobel__aligned R_full__aligned R_mmi__aligned \
+        -- --split test)
+
+    for metric in organ sobel full mmi; do
+        run_reg "rigid_${metric}" "$LOG_DIR/rigid_${metric}_reg.log" \
+            $PYTHON run_rigid.py --metric "$metric" --input aligned \
+                --split test || true
+    done
+
+    touch "$sentinel"; wait "$w"
+    echo "[$(ts)] job_rigid_variants complete"
+}
+
 job_deeds() {
     hdr "B2 DEEDS  (aligned + baseline + raw — test split)"
     local sentinel="$LOG_DIR/.deeds_reg_done"
@@ -290,6 +310,7 @@ echo ""
 job_a1_a2              > "$LOG_DIR/job_a1a2.log"             2>&1 &  PID_A1A2=$!
 job_a_series_aligned   > "$LOG_DIR/job_a_series_aligned.log" 2>&1 &  PID_ALN=$!
 job_a_series_baseline  > "$LOG_DIR/job_a_series_baseline.log" 2>&1 & PID_BAS=$!
+job_rigid_variants     > "$LOG_DIR/job_rigid_variants.log"   2>&1 &  PID_RV=$!
 job_deeds              > "$LOG_DIR/job_deeds.log"            2>&1 &  PID_D=$!
 job_ants               > "$LOG_DIR/job_ants.log"             2>&1 &  PID_A=$!
 job_unigradicon        > "$LOG_DIR/job_ugi.log"              2>&1 &  PID_U=$!
@@ -299,6 +320,7 @@ echo "Background PIDs:"
 echo "  A1/A2 eval          = $PID_A1A2  → tail -f $LOG_DIR/job_a1a2.log"
 echo "  A-series aligned    = $PID_ALN   → tail -f $LOG_DIR/job_a_series_aligned.log"
 echo "  A-series baseline   = $PID_BAS   → tail -f $LOG_DIR/job_a_series_baseline.log"
+echo "  Rigid variants      = $PID_RV    → tail -f $LOG_DIR/job_rigid_variants.log"
 echo "  DEEDS               = $PID_D     → tail -f $LOG_DIR/job_deeds.log"
 echo "  ANTs                = $PID_A     → tail -f $LOG_DIR/job_ants.log"
 echo "  uniGradICON         = $PID_U     → tail -f $LOG_DIR/job_ugi.log"
@@ -312,6 +334,7 @@ FAIL=0
 wait $PID_A1A2 || { echo "[$(ts)] WARN: A1/A2 eval non-zero";           FAIL=1; }
 wait $PID_ALN  || { echo "[$(ts)] WARN: A-series aligned non-zero";     FAIL=1; }
 wait $PID_BAS  || { echo "[$(ts)] WARN: A-series baseline non-zero";    FAIL=1; }
+wait $PID_RV   || { echo "[$(ts)] WARN: Rigid variants non-zero";       FAIL=1; }
 wait $PID_D    || { echo "[$(ts)] WARN: DEEDS non-zero";                FAIL=1; }
 wait $PID_A    || { echo "[$(ts)] WARN: ANTs non-zero";                 FAIL=1; }
 wait $PID_U    || { echo "[$(ts)] WARN: uniGradICON non-zero";          FAIL=1; }

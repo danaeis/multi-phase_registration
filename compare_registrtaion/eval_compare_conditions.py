@@ -161,7 +161,8 @@ def build_comparison_table(detail_by_cond: Dict[str, pd.DataFrame]) -> pd.DataFr
             rows.append({
                 "Method": label,
                 "Eroded Dice ↑": "—", "HD95 ↓ (mm)": "—",
-                "Centroid ↓ (mm)": "—", "|∇HU|-NCC ↑": "—", "%|J|<0 ↓": "—",
+                "Centroid ↓ (mm)": "—", "|∇HU|-NCC ↑": "—",
+                "MIND-NCC ↑": "—", "%|J|<0 ↓": "—",
             })
             continue
 
@@ -171,12 +172,15 @@ def build_comparison_table(detail_by_cond: Dict[str, pd.DataFrame]) -> pd.DataFr
         else:
             jac = "—"
 
+        mind = _fmt(df["mind_ncc"], ".3f") if "mind_ncc" in df.columns else "—"
+
         rows.append({
             "Method":          label,
             "Eroded Dice ↑":   _fmt(df["eroded_dice"], ".3f"),
             "HD95 ↓ (mm)":     _fmt(df["hd95_mm"],     ".1f"),
             "Centroid ↓ (mm)": _fmt(df["centroid_mm"], ".1f"),
             "|∇HU|-NCC ↑":     _fmt(df["sobel_ncc"],   ".3f"),
+            "MIND-NCC ↑":      mind,
             "%|J|<0 ↓":        jac,
         })
 
