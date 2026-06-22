@@ -239,13 +239,19 @@ def run_baseline(algo_tag: str,
                  input_key: str,
                  register_fn,
                  labels_df: pd.DataFrame,
-                 studies: Optional[list] = None,
-                 skip_existing: bool = True) -> None:
+                 studies=None,
+                 skip_existing: bool = True,
+                 resource_csv: Optional[Path] = None) -> None:
     """
     Drive one comparison algorithm over one input source.
 
     register_fn(fixed_img, moving_img, moving_seg, item) -> RegResult
+
+    resource_csv: if provided, append per-study timing/memory rows there.
     """
+    from collections import defaultdict
+    from resource_monitor import ResourceMonitor, append_resource_row
+
     tag = C.condition_tag(algo_tag, input_key)
     cond = C.CONDITIONS[tag]
     src = C.INPUTS[input_key]
@@ -276,54 +282,80 @@ def run_baseline(algo_tag: str,
     print(f"\n{'='*80}\n{tag}\n  input : {src.dir}\n  output: {cond.base_dir}\n{'='*80}")
     if is_raw:
         print(f"  (raw layout: flat vols in {src.dir}, flat segs in {seg_dir})")
+    if studies:
+        print(f"  study filter: {len(studies)} studies")
 
-    n_ok = n_skip = n_fail = 0
+    # Group pairs by study so we can time/track resources per study.
+    study_pairs: dict = defaultdict(list)
     for item in iter_pairs(labels_df, src.dir, src.vol_postfix, seg_postfix,
                            seg_dir=seg_dir, flat=flat):
         if studies and item["study"] not in studies:
             continue
+        study_pairs[item["study"]].append(item)
 
-        out_pre = cond.base_dir / item["study"] / f"{item['study']}_{item['mv_sid']}"
-        if skip_existing and os.path.exists(str(out_pre) + cond.vol_postfix):
-            n_skip += 1
-            continue
+    n_ok = n_skip = n_fail = 0
 
-        print(f"  [{item['phase']:<12}] {item['study'][:40]}…", flush=True)
-        try:
-            fixed  = sitk.ReadImage(item["fixed_vol"])
-            moving = sitk.ReadImage(item["moving_vol"])
-            mov_sg = sitk.ReadImage(item["moving_seg"])
+    for study_id in sorted(study_pairs):
+        items = study_pairs[study_id]
 
-            if _PROFILING:
-                _ctx = _profile_stage(
-                    algo_tag, input_key,
-                    item["study"], item["phase"],
-                    PROFILING_DIR,
-                )
-            else:
-                import contextlib
-                _ctx = contextlib.nullcontext()
+        with ResourceMonitor() as monitor:
+            n_ok_s = n_skip_s = n_fail_s = 0
 
-            with _ctx:
-                res = register_fn(fixed, moving, mov_sg, item)
+            for item in items:
+                out_pre = cond.base_dir / item["study"] / f"{item['study']}_{item['mv_sid']}"
+                if skip_existing and os.path.exists(str(out_pre) + cond.vol_postfix):
+                    n_skip_s += 1
+                    continue
 
-            if res.warped_vol is None and res.transform is not None:
-                res.warped_vol = warp_volume(moving, fixed, res.transform)
-                res.warped_seg = warp_label(mov_sg, fixed, res.transform)
-                if cond.is_deformable and res.dvf_zyx3_mm is None:
-                    res.dvf_zyx3_mm = transform_to_mm_dvf_array(res.transform, fixed)
+                print(f"  [{item['phase']:<12}] {item['study'][:40]}…", flush=True)
+                try:
+                    fixed  = sitk.ReadImage(item["fixed_vol"])
+                    moving = sitk.ReadImage(item["moving_vol"])
+                    mov_sg = sitk.ReadImage(item["moving_seg"])
 
-            if res.warped_vol is None or res.warped_seg is None:
-                raise RuntimeError("register_fn returned neither a transform nor warped images")
+                    if _PROFILING:
+                        _ctx = _profile_stage(
+                            algo_tag, input_key,
+                            item["study"], item["phase"],
+                            PROFILING_DIR,
+                        )
+                    else:
+                        import contextlib
+                        _ctx = contextlib.nullcontext()
 
-            save_outputs(item, tag, res.warped_vol, res.warped_seg,
-                         res.dvf_zyx3_mm if cond.is_deformable else None)
-            also_save_warped_nc(item, tag)
-            n_ok += 1
-        except Exception as e:                          # pragma: no cover
-            import traceback; traceback.print_exc()
-            print(f"    ✗ {e}")
-            n_fail += 1
+                    with _ctx:
+                        res = register_fn(fixed, moving, mov_sg, item)
+
+                    if res.warped_vol is None and res.transform is not None:
+                        res.warped_vol = warp_volume(moving, fixed, res.transform)
+                        res.warped_seg = warp_label(mov_sg, fixed, res.transform)
+                        if cond.is_deformable and res.dvf_zyx3_mm is None:
+                            res.dvf_zyx3_mm = transform_to_mm_dvf_array(res.transform, fixed)
+
+                    if res.warped_vol is None or res.warped_seg is None:
+                        raise RuntimeError("register_fn returned neither a transform nor warped images")
+
+                    save_outputs(item, tag, res.warped_vol, res.warped_seg,
+                                 res.dvf_zyx3_mm if cond.is_deformable else None)
+                    also_save_warped_nc(item, tag)
+                    n_ok_s += 1
+                except Exception as e:                          # pragma: no cover
+                    import traceback; traceback.print_exc()
+                    print(f"    ✗ {e}")
+                    n_fail_s += 1
+
+        n_ok += n_ok_s; n_skip += n_skip_s; n_fail += n_fail_s
+
+        # Record resource stats for this study if any real work was done
+        if resource_csv is not None and (n_ok_s > 0 or n_fail_s > 0):
+            append_resource_row(Path(resource_csv), {
+                "condition":   tag,
+                "study_id":    study_id,
+                "n_pairs":     len(items),
+                "n_ok":        n_ok_s,
+                "n_fail":      n_fail_s,
+                **monitor.as_dict,
+            })
 
     print(f"\n  done {tag}: ok={n_ok} skip={n_skip} fail={n_fail}")
 
@@ -331,7 +363,10 @@ def run_baseline(algo_tag: str,
 def make_cli(algo_tag: str, register_fn_factory):
     """
     Shared CLI for every runner. register_fn_factory(args) -> register_fn.
-    Adds --input {aligned,baseline,both}, --studies, --labels_csv, --no-skip.
+    Adds --input, --studies, --split, --labels_csv, --no-skip.
+
+    --split test   restricts to the test split from generate_split.py.
+                   Resource timing CSV is written automatically per condition.
     """
     import argparse
     p = argparse.ArgumentParser(description=f"{algo_tag} comparison runner")
@@ -341,11 +376,23 @@ def make_cli(algo_tag: str, register_fn_factory):
                         "raw (no crop/align). both=aligned+baseline, "
                         "all=aligned+baseline+raw.")
     p.add_argument("--studies", nargs="*", default=None,
-                   help="Optional subset of study IDs.")
+                   help="Optional explicit subset of study IDs.")
+    p.add_argument("--split", choices=["all", "train", "test"], default="all",
+                   help="Restrict processing to the train or test split "
+                        "(uses splits/train_test_split.csv from generate_split.py).")
     p.add_argument("--labels_csv", default=str(C.LABELS_CSV))
     p.add_argument("--no-skip", action="store_true",
                    help="Recompute even if output exists.")
     args, _ = p.parse_known_args()
+
+    # Resolve study filter: merge --studies and --split
+    studies = set(args.studies) if args.studies else None
+    if args.split != "all":
+        from generate_split import load_split as _load_split
+        split_ids = _load_split(args.split)
+        studies = (studies & split_ids) if studies else split_ids
+        print(f"  split={args.split}: {len(split_ids)} studies in split"
+              + (f", {len(studies)} after --studies filter" if args.studies else ""))
 
     labels_df = pd.read_csv(args.labels_csv)
     register_fn = register_fn_factory(args)
@@ -361,8 +408,11 @@ def make_cli(algo_tag: str, register_fn_factory):
         if ikey == "baseline" and not algo.run_on_baseline:
             print(f"  ({algo_tag} not configured for baseline input — skipping)")
             continue
+        tag = C.condition_tag(algo_tag, ikey)
+        resource_csv = C.RESULTS_DIR / tag / "resource_stats.csv"
         run_baseline(algo_tag, ikey, register_fn, labels_df,
-                     studies=args.studies, skip_existing=not args.no_skip)
+                     studies=studies, skip_existing=not args.no_skip,
+                     resource_csv=resource_csv)
 
 
 

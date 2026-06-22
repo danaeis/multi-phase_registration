@@ -1127,12 +1127,16 @@ def register_all_studies(
         vol_postfix, seg_reg_postfix, seg_full_postfix,
         skip_existing=True, pass1_max_iter=200, pass2_iterations=100,
         use_gpu=_TORCH_AVAILABLE,
+        study_ids=None,
 ):
     labels_df = pd.read_csv(labels_csv)
     catalog   = scan_input_directory(input_dir, vol_postfix,
                                       seg_reg_postfix, seg_full_postfix)
     if not catalog: print("No studies found."); return
     valid = sorted(set(catalog) & set(labels_df["StudyInstanceUID"].unique()))
+    if study_ids is not None:
+        valid = [s for s in valid if s in study_ids]
+        print(f"  study_ids filter: {len(valid)} studies selected")
     os.makedirs(output_dir, exist_ok=True)
     print(f"\n{'='*80}")
     print(f"BATCH  studies={len(valid)}  gpu={use_gpu and _TORCH_AVAILABLE}")
@@ -1164,6 +1168,21 @@ if __name__ == "__main__":
     no_gpu   = "--no-gpu"   in args
     use_gpu  = _TORCH_AVAILABLE and not no_gpu
 
+    # --split test|train|all  (loads study IDs from compare_registrtaion/generate_split.py)
+    _split_val = "all"
+    for _a in args:
+        if _a.startswith("--split="):
+            _split_val = _a.split("=", 1)[1]
+        elif _a == "--split" and args.index(_a) + 1 < len(args):
+            _split_val = args[args.index(_a) + 1]
+    _study_filter = None
+    if _split_val != "all":
+        import sys as _sys
+        _sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "compare_registrtaion"))
+        from generate_split import load_split as _load_split
+        _study_filter = _load_split(_split_val)
+        print(f"  --split {_split_val}: restricting to {len(_study_filter)} studies")
+
     if baseline:
         idir, odir = str(BASELINE_INPUT_DIR), str(BASELINE_OUTPUT_DIR)
         vp, srp, sfp = BASELINE_VOL_POSTFIX, BASELINE_SEG_REG_POSTFIX, BASELINE_SEG_FULL_POSTFIX
@@ -1176,7 +1195,8 @@ if __name__ == "__main__":
 
     if "--all" in args:
         register_all_studies(idir, odir, LABELS_CSV, vp, srp, sfp,
-                             skip_existing=skip, use_gpu=use_gpu)
+                             skip_existing=skip, use_gpu=use_gpu,
+                             study_ids=_study_filter)
     else:
         print("in single organ")
         sid       = next((a for a in args if not a.startswith("--")), EXAMPLE_STUDY_ID)

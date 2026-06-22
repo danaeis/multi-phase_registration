@@ -114,13 +114,15 @@ class ConditionWatcher:
         ref_phase: str,
         erosion_mm: float,
         workers: int,
+        study_ids: Optional[Set[str]] = None,
     ):
         self.cond       = cond
         self.labels_df  = labels_df
         self.ref_phase  = ref_phase
         self.erosion_mm = erosion_mm
         self.workers    = workers
-        self.done: Set[str] = set()  # study_ids already evaluated
+        self.study_ids  = study_ids   # None = all, else restrict to this set
+        self.done: Set[str] = set()   # study_ids already evaluated
 
         # Load already-evaluated studies from an existing detail CSV
         if cond.detail_csv.exists():
@@ -145,7 +147,9 @@ class ConditionWatcher:
 
         candidate_dirs = sorted(
             d.name for d in base_dir.iterdir()
-            if d.is_dir() and d.name not in self.done
+            if d.is_dir()
+            and d.name not in self.done
+            and (self.study_ids is None or d.name in self.study_ids)
         )
 
         for study_id in candidate_dirs:
@@ -272,6 +276,8 @@ def main() -> None:
     p.add_argument("--erosion_mm", type=float, default=C.EROSION_MM)
     p.add_argument("--workers",    type=int,   default=1,
                    help="Parallel workers passed to evaluate_study (default: 1).")
+    p.add_argument("--split", choices=["all", "train", "test"], default="all",
+                   help="Evaluate only the train/test split (default: all).")
     args = p.parse_args()
 
     unknown = [t for t in args.conditions if t not in C.CONDITIONS]
@@ -279,6 +285,12 @@ def main() -> None:
         raise SystemExit(
             f"Unknown condition(s): {unknown}\nValid: {list(C.CONDITIONS)}"
         )
+
+    study_ids: Optional[Set[str]] = None
+    if args.split != "all":
+        from generate_split import load_split as _load_split
+        study_ids = _load_split(args.split)
+        print(f"  --split {args.split}: evaluating {len(study_ids)} studies only")
 
     labels_df = pd.read_csv(args.labels_csv)
 
@@ -289,6 +301,7 @@ def main() -> None:
             ref_phase  = args.ref_phase,
             erosion_mm = args.erosion_mm,
             workers    = args.workers,
+            study_ids  = study_ids,
         )
         for tag in args.conditions
     ]

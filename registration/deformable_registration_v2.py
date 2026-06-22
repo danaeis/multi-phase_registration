@@ -1039,6 +1039,7 @@ def register_all_studies_deformable(
         sampling_pct:    float = 0.15,
         save_field:      bool  = True,
         skip_existing:   bool  = True,
+        study_ids=None,
 ) -> None:
     labels_df = pd.read_csv(labels_csv)
     catalog   = scan_input_directory(
@@ -1048,6 +1049,9 @@ def register_all_studies_deformable(
         print("❌ No studies found."); return
 
     valid  = sorted(set(catalog) & set(labels_df["StudyInstanceUID"].unique()))
+    if study_ids is not None:
+        valid = [s for s in valid if s in study_ids]
+        print(f"  study_ids filter: {len(valid)} studies selected")
     logger = DeformableLogger(output_dir, metric, grid_spacing_mm)
     os.makedirs(output_dir, exist_ok=True)
 
@@ -1166,7 +1170,20 @@ if __name__ == "__main__":
         "--no-field", action="store_true",
         help="Do NOT save displacement field (saves ~150-300 MB per phase)",
     )
+    ap.add_argument(
+        "--split", choices=["all", "train", "test"], default="all",
+        help="Restrict to the train/test split from compare_registrtaion/generate_split.py.",
+    )
     args = ap.parse_args()
+
+    # Resolve split filter
+    _study_filter = None
+    if args.split != "all":
+        import sys as _sys
+        _sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "compare_registrtaion"))
+        from generate_split import load_split as _load_split
+        _study_filter = _load_split(args.split)
+        print(f"  --split {args.split}: restricting to {len(_study_filter)} studies")
 
     input_dir = str(INPUT_DIR_BASELINE if args.baseline else INPUT_DIR_ALIGNED)
     mode      = "baseline" if args.baseline else "aligned"
@@ -1189,6 +1206,7 @@ if __name__ == "__main__":
             sampling_pct=args.sampling,
             save_field=not args.no_field,
             skip_existing=args.skip,
+            study_ids=_study_filter,
         )
     else:
         labels_df = pd.read_csv(LABELS_CSV)

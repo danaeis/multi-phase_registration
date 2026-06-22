@@ -57,13 +57,16 @@ def folding_for_condition(
     cond: C.Condition,
     labels_df: pd.DataFrame,
     ref_phase: str,
+    study_ids=None,
 ) -> pd.DataFrame:
     rows: List[dict] = []
     if cond.dvf_postfix is None or not cond.base_dir.exists():
         return pd.DataFrame(rows)
 
     study_dirs = sorted(
-        d for d in os.listdir(cond.base_dir) if (cond.base_dir / d).is_dir()
+        d for d in os.listdir(cond.base_dir)
+        if (cond.base_dir / d).is_dir()
+        and (study_ids is None or d in study_ids)
     )
     for study_id in study_dirs:
         study_rows = labels_df[labels_df["StudyInstanceUID"] == study_id]
@@ -96,8 +99,11 @@ def run_condition(
     ref_phase: str,
     erosion_mm: float,
     workers: int = 1,
+    study_ids=None,
 ) -> Optional[pd.DataFrame]:
     print(f"\n{'#'*70}\n# CONDITION: {cond.tag}\n{'#'*70}")
+    if study_ids is not None:
+        print(f"  study filter: {len(study_ids)} studies (split)")
 
     if not cond.base_dir.exists():
         print(f"  base_dir not found: {cond.base_dir} — skipping.")
@@ -112,6 +118,7 @@ def run_condition(
         erosion_mm=erosion_mm,
         out_csv=None,
         workers=workers,
+        study_ids=study_ids,
     )
     if df is None or df.empty:
         print(f"  no organ results for {cond.tag} — check postfixes / base_dir.")
@@ -120,7 +127,7 @@ def run_condition(
     df.insert(0, "condition", cond.tag)
 
     if cond.is_deformable:
-        fold = folding_for_condition(cond, labels_df, ref_phase)
+        fold = folding_for_condition(cond, labels_df, ref_phase, study_ids=study_ids)
         if not fold.empty:
             df = df.merge(fold, on=["study_id", "phase"], how="left")
             print(f"  folding attached for {fold['study_id'].nunique()} studies")
@@ -202,7 +209,15 @@ def main() -> None:
     p.add_argument("--erosion_mm", type=float, default=C.EROSION_MM)
     p.add_argument("--workers",    type=int,   default=1,
                    help="Parallel worker processes per condition (default: 1).")
+    p.add_argument("--split", choices=["all", "train", "test"], default="all",
+                   help="Evaluate only the train/test split (default: all).")
     args = p.parse_args()
+
+    study_ids = None
+    if args.split != "all":
+        from generate_split import load_split as _load_split
+        study_ids = _load_split(args.split)
+        print(f"  --split {args.split}: evaluating {len(study_ids)} studies only")
 
     if args.all or (args.conditions is None and args.prefix is None):
         tags = list(C.CONDITIONS)
@@ -228,6 +243,7 @@ def main() -> None:
             C.CONDITIONS[tag], labels_df,
             args.labels_csv, args.ref_phase, args.erosion_mm,
             workers=args.workers,
+            study_ids=study_ids,
         )
         if df is not None:
             detail_by_cond[tag] = df

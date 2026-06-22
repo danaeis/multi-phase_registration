@@ -28,7 +28,8 @@ fi
 # ── Running PIDs ──────────────────────────────────────────────────────────────
 echo ""
 echo "  Active Python processes (registration/evaluation):"
-pgrep -la python3 2>/dev/null | grep -E "run_deeds|run_ants|run_unigradicon|deformable|eval_compare" \
+pgrep -la python3 2>/dev/null \
+    | grep -E "run_deeds|run_ants|run_unigradicon|deformable|eval_compare|register_fixed|watch_and_eval" \
     | sed 's/^/    /' || echo "    (none)"
 
 # ── Per-condition file counts ─────────────────────────────────────────────────
