@@ -262,6 +262,8 @@ if __name__ == "__main__":
                    help="Override the condition tag written to disk.\n"
                         "Must exist in compare_config.BASELINE_ALGOS.\n"
                         "Use 'B5_unigradicon_io' when running with --io_steps.")
+    p.add_argument("--split", choices=["all", "train", "test"], default="all",
+                   help="Restrict to the train/test split from generate_split.py.")
     args = p.parse_args()
 
     effective_tag = args.algo_tag
@@ -270,6 +272,15 @@ if __name__ == "__main__":
             f"--algo_tag '{effective_tag}' not found in compare_config.BASELINE_ALGOS.\n"
             f"Available: {list(C.BASELINE_ALGOS)}"
         )
+
+    # Resolve study filter: merge --studies and --split
+    studies = set(args.studies) if args.studies else None
+    if args.split != "all":
+        from generate_split import load_split as _load_split
+        split_ids = _load_split(args.split)
+        studies = (studies & split_ids) if studies else split_ids
+        print(f"  split={args.split}: {len(split_ids)} studies"
+              + (f", {len(studies)} after --studies filter" if args.studies else ""))
 
     labels_df = pd.read_csv(args.labels_csv)
 
@@ -291,8 +302,10 @@ if __name__ == "__main__":
         if ikey == "baseline" and not algo.run_on_baseline:
             print(f"  ({effective_tag} not configured for baseline input — skipping)")
             continue
+        resource_csv = C.RESULTS_DIR / C.condition_tag(effective_tag, ikey) / "resource_stats.csv"
         K.run_baseline(
             effective_tag, ikey, _register_fn, labels_df,
-            studies=args.studies,
+            studies=studies,
             skip_existing=not args.no_skip,
+            resource_csv=resource_csv,
         )
