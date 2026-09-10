@@ -404,7 +404,77 @@ def _grad_mag(vol_np: np.ndarray) -> np.ndarray:
     v = vol_np.astype(np.float64)
     return np.sqrt(sum(nd_sobel(v, axis=i)**2 for i in range(3))).astype(np.float32)
 
+def _mind_map(vol_np: np.ndarray, d: int = 2, patch: int = 7) -> np.ndarray:
+    from scipy.ndimage import uniform_filter as _uf
+    vol = vol_np.astype(np.float32)
+    local_mean = _uf(vol,    size=patch).astype(np.float32)
+    local_sq   = _uf(vol**2, size=patch).astype(np.float32)
+    H = local_sq - local_mean**2 + 1e-5
+    channels = []
+    for axis in range(3):
+        for sign in (+1, -1):
+            shifted = np.roll(vol, sign * d, axis=axis)
+            ssd = _uf((vol - shifted)**2, size=patch).astype(np.float32)
+            channels.append(np.exp(-ssd / H))
+    return np.stack(channels, axis=0)   # (6, Z, Y, X)
 
+
+def _fast_mind_loss(params, batch: Precomp,
+                    fixed_mind: np.ndarray, moving_mind: np.ndarray) -> float:
+    rx, ry, rz, tx, ty, tz = params
+    R = _euler_to_R(rx, ry, rz)
+    t = np.array([tx, ty, tz], np.float32)
+    Z, Y, X = batch.shape_zyx
+
+    pts  = _forward_transform(batch.all_coords, R, t, batch.center)
+    vox  = _phys_to_vox_zyx(pts, batch.origin, batch.spacing, batch.dir_inv)
+    in_b = ((vox[:,0]>=0)&(vox[:,0]<Z)&(vox[:,1]>=0)&(vox[:,1]<Y)
+            &(vox[:,2]>=0)&(vox[:,2]<X))
+    if in_b.sum() < 10:
+        return 1.0
+
+    vf  = vox[in_b]
+    fm  = fixed_mind[:, vf[:,0], vf[:,1], vf[:,2]].astype(np.float64)
+
+    orig_vox = _phys_to_vox_zyx(batch.all_coords[in_b],
+                                  batch.origin, batch.spacing, batch.dir_inv)
+    in_b2 = ((orig_vox[:,0]>=0)&(orig_vox[:,0]<Z)
+             &(orig_vox[:,1]>=0)&(orig_vox[:,1]<Y)
+             &(orig_vox[:,2]>=0)&(orig_vox[:,2]<X))
+    if in_b2.sum() < 10:
+        return 1.0
+
+    fm = fm[:, in_b2]
+    mm = moving_mind[:, orig_vox[in_b2,0],
+                        orig_vox[in_b2,1],
+                        orig_vox[in_b2,2]].astype(np.float64)
+
+    ncc_sum, valid = 0.0, 0
+    for c in range(fm.shape[0]):
+        f_c = fm[c] - fm[c].mean(); m_c = mm[c] - mm[c].mean()
+        dn  = np.linalg.norm(f_c) * np.linalg.norm(m_c)
+        if dn > 1e-6:
+            ncc_sum += float(np.dot(f_c, m_c) / dn); valid += 1
+    return -(ncc_sum / valid) if valid > 0 else 1.0
+
+
+def register_mind(fixed, moving, moving_seg, item) -> K.RegResult:
+    batch = _make_batch(item["fixed_seg"], moving_seg, fixed)
+    print("    computing MIND descriptors...", flush=True)
+    fm = _mind_map(sitk.GetArrayFromImage(fixed).astype(np.float32))
+    mm = _mind_map(sitk.GetArrayFromImage(moving).astype(np.float32))
+
+    t0 = _centroid_seed(batch)
+    x0 = np.array([0.0, 0.0, 0.0, t0[0], t0[1], t0[2]])
+    print(f"    centroid seed: t={t0.round(1)}mm  loss0="
+          f"{_fast_mind_loss(x0, batch, fm, mm):.4f}", flush=True)
+
+    res = minimize(_fast_mind_loss, x0, args=(batch, fm, mm), method="Nelder-Mead",
+                   options={"maxiter": NM_MAXITER, "xatol": 0.1, "fatol": 1e-4,
+                            "disp": False, "initial_simplex": _init_simplex(x0)})
+    print(f"    mind done: loss={res.fun:.4f} iters={res.nit}", flush=True)
+    return K.RegResult(transform=_params_to_tx(res.x, batch.center))
+    
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -413,6 +483,7 @@ _METRICS = {
     "sobel": ("R_sobel", register_sobel),
     "full":  ("R_full",  register_full),
     "mmi":   ("R_mmi",   register_mmi),
+    "mind":  ("R_mind",  register_mind),
 }
 
 if __name__ == "__main__":

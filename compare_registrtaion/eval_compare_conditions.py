@@ -215,13 +215,24 @@ def main() -> None:
                    help="Parallel worker processes per condition (default: 1).")
     p.add_argument("--split", choices=["all", "train", "test"], default="all",
                    help="Evaluate only the train/test split (default: all).")
+    p.add_argument("--table-only", action="store_true",
+                   help="Skip re-evaluation: load existing eval_detail.csv files,\n"
+                        "filter to --split, and rebuild the comparison table only.\n"
+                        "Conditions with no CSV are listed as '—'. Use this to get\n"
+                        "a fast table from already-complete watcher outputs.")
+    p.add_argument("--fill-missing", action="store_true",
+                   help="Smart mode: if a condition already has an eval_detail.csv\n"
+                        "with rows for the requested split, load it as-is and skip\n"
+                        "re-evaluation. Only run evaluate_all() for conditions whose\n"
+                        "CSV is absent or has zero rows for the split. Faster than\n"
+                        "--all when most conditions are already evaluated.")
     args = p.parse_args()
 
     study_ids = None
     if args.split != "all":
         from generate_split import load_split as _load_split
         study_ids = _load_split(args.split)
-        print(f"  --split {args.split}: evaluating {len(study_ids)} studies only")
+        print(f"  --split {args.split}: {len(study_ids)} studies")
 
     if args.all or (args.conditions is None and args.prefix is None):
         tags = list(C.CONDITIONS)
@@ -242,15 +253,74 @@ def main() -> None:
     labels_df = pd.read_csv(args.labels_csv)
 
     detail_by_cond: Dict[str, pd.DataFrame] = {}
-    for tag in tags:
-        df = run_condition(
-            C.CONDITIONS[tag], labels_df,
-            args.labels_csv, args.ref_phase, args.erosion_mm,
-            workers=args.workers,
-            study_ids=study_ids,
-        )
-        if df is not None:
+
+    def _load_existing_csv(cond: C.Condition, study_ids) -> Optional[pd.DataFrame]:
+        """Load an existing eval_detail.csv, filter to split, return None if absent/empty."""
+        if not cond.detail_csv.exists():
+            return None
+        try:
+            df = pd.read_csv(cond.detail_csv)
+            if study_ids is not None:
+                df = df[df["study_id"].isin(study_ids)]
+            return df if not df.empty else None
+        except Exception as exc:
+            print(f"  {cond.tag}: failed to load CSV — {exc}")
+            return None
+
+    if args.table_only:
+        # Fast path: load existing CSVs, filter to split, skip all re-evaluation
+        print("\n[table-only] Loading existing eval_detail.csv files...")
+        for tag in tags:
+            cond = C.CONDITIONS[tag]
+            df = _load_existing_csv(cond, study_ids)
+            if df is None:
+                print(f"  {tag}: no CSV / no split rows — will appear as '—'")
+                continue
+            print(f"  {tag}: {df['study_id'].nunique()} studies loaded from CSV")
             detail_by_cond[tag] = df
+
+    elif args.fill_missing:
+        # Smart path: use existing CSV if it has split rows, else evaluate
+        print("\n[fill-missing] Checking which conditions need evaluation...")
+        need_eval, already_done = [], []
+        for tag in tags:
+            cond = C.CONDITIONS[tag]
+            df = _load_existing_csv(cond, study_ids)
+            if df is not None:
+                already_done.append(tag)
+                detail_by_cond[tag] = df
+            else:
+                # Check if there are any vol files to evaluate at all
+                if cond.base_dir.exists() and any(cond.base_dir.iterdir()):
+                    need_eval.append(tag)
+                else:
+                    already_done.append(tag)  # nothing to do → '—' in table
+
+        print(f"  Already have CSV: {len(already_done)} conditions")
+        print(f"  Need evaluation:  {len(need_eval)} conditions")
+        for tag in need_eval:
+            print(f"    → {tag}")
+
+        for tag in need_eval:
+            df = run_condition(
+                C.CONDITIONS[tag], labels_df,
+                args.labels_csv, args.ref_phase, args.erosion_mm,
+                workers=args.workers,
+                study_ids=study_ids,
+            )
+            if df is not None:
+                detail_by_cond[tag] = df
+
+    else:
+        for tag in tags:
+            df = run_condition(
+                C.CONDITIONS[tag], labels_df,
+                args.labels_csv, args.ref_phase, args.erosion_mm,
+                workers=args.workers,
+                study_ids=study_ids,
+            )
+            if df is not None:
+                detail_by_cond[tag] = df
 
     if not detail_by_cond:
         print("\nNo conditions produced results. Nothing to aggregate.")
