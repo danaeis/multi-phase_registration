@@ -863,9 +863,16 @@ def register_study_deformable(
         final_interpolator: int   = sitk.sitkLanczosWindowedSinc,
         save_field:         bool  = True,
         skip_existing:      bool  = True,
+        use_mask:           bool  = True,
 ) -> dict:
     """
     Register all non-NC phases of one study to the NC (fixed) reference.
+
+    `use_mask=False` evaluates the similarity metric over the WHOLE IMAGE instead
+    of restricting it to the organ mask. That is the control arm for the central
+    claim: it is the difference between *constraining the domain* of the metric
+    and merely choosing a different metric. The mask is still built and logged
+    either way, so mask-coverage diagnostics stay comparable across arms.
 
     Returns: {"status", "study_id", "successful": [...], "failed": [...], "skipped": [...]}
     """
@@ -959,10 +966,13 @@ def register_study_deformable(
             # to absorb any residual rigid offset before B-spline takes over.
             print("  Building moving mask (fixed mask + 12mm dilation in moving space)...")
             moving_mask = resample_mask_to_moving(fixed_mask, mov_img, extra_dilation_mm=12.0)
+            if not use_mask:
+                print("  --no-mask: metric evaluated over the WHOLE IMAGE (control arm)")
 
             reg_vol, final_tx, meta = run_deformable(
                 metric, nc_img, mov_img, nc_seg_reg, mov_seg_reg,
-                fixed_mask, moving_mask,
+                fixed_mask if use_mask else None,
+                moving_mask if use_mask else None,
                 grid_spacing_mm=grid_spacing_mm,
                 num_iterations=num_iterations,
                 sampling_pct=sampling_pct,
@@ -1040,6 +1050,7 @@ def register_all_studies_deformable(
         save_field:      bool  = True,
         skip_existing:   bool  = True,
         study_ids=None,
+        use_mask:        bool  = True,
 ) -> None:
     labels_df = pd.read_csv(labels_csv)
     catalog   = scan_input_directory(
@@ -1084,6 +1095,7 @@ def register_all_studies_deformable(
                 sampling_pct=sampling_pct,
                 save_field=save_field,
                 skip_existing=skip_existing,
+                use_mask=use_mask,
             )
             study_times.append(time.time() - t0)
 
@@ -1171,6 +1183,13 @@ if __name__ == "__main__":
         help="Do NOT save displacement field (saves ~150-300 MB per phase)",
     )
     ap.add_argument(
+        "--no-mask", action="store_true",
+        help="Evaluate the metric over the WHOLE IMAGE instead of restricting it\n"
+             "to the organ mask. This is the control arm for the thesis's central\n"
+             "registration claim (domain restriction, not metric choice). Output\n"
+             "goes to a separate '_nomask' directory so both arms coexist.",
+    )
+    ap.add_argument(
         "--split", choices=["all", "train", "test"], default="all",
         help="Restrict to the train/test split from compare_registrtaion/generate_split.py.",
     )
@@ -1190,9 +1209,12 @@ if __name__ == "__main__":
     out_dir   = str(OUTPUT_DIR_BASE) + f"_{args.metric}"
     if args.baseline:
         out_dir += "_baseline"
+    if args.no_mask:
+        out_dir += "_nomask"
 
     print(
-        f"metric={args.metric}  grid={args.grid}mm  mode={mode}\n"
+        f"metric={args.metric}  grid={args.grid}mm  mode={mode}  "
+        f"metric_domain={'whole-image' if args.no_mask else 'organ-mask'}\n"
         f"out={out_dir}\n"
         f"all={args.all}  skip={args.skip}  save_field={not args.no_field}\n"
         f"iters={args.iters}  sampling={args.sampling:.0%}"
@@ -1207,6 +1229,7 @@ if __name__ == "__main__":
             save_field=not args.no_field,
             skip_existing=args.skip,
             study_ids=_study_filter,
+            use_mask=not args.no_mask,
         )
     else:
         labels_df = pd.read_csv(LABELS_CSV)
@@ -1222,5 +1245,6 @@ if __name__ == "__main__":
             sampling_pct=args.sampling,
             save_field=not args.no_field,
             skip_existing=args.skip,
+            use_mask=not args.no_mask,
         )
         logger.save_batch_csv()

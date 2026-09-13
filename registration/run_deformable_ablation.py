@@ -123,11 +123,13 @@ COL_HEADER = {"eroded_dice": "Dice↑", "hd95_mm": "HD95↓(mm)",
 # STEP 1 — Registration
 # ===========================================================================
 
-def output_dir_for(metric: str, baseline: bool = False) -> Path:
+def output_dir_for(metric: str, baseline: bool = False, no_mask: bool = False) -> Path:
     """Mirrors the out_dir computation in deformable_registration_v2.py __main__."""
     d = _DEFORMABLE_BASE.parent / (f"deformable_registered_{metric}")
     if baseline:
         d = Path(str(d) + "_baseline")
+    if no_mask:
+        d = Path(str(d) + "_nomask")
     return d
 
 
@@ -140,6 +142,8 @@ def run_registration(
         no_field: bool,
         baseline: bool,
         dry_run: bool,
+        no_mask: bool = False,
+        split: str = "all",
 ) -> bool:
     """
     Run deformable_registration_v2.py for one metric.
@@ -161,6 +165,10 @@ def run_registration(
         cmd.append("--no-field")
     if baseline:
         cmd.append("--baseline")
+    if no_mask:
+        cmd.append("--no-mask")
+    if split != "all":
+        cmd.extend(["--split", split])
 
     print(f"\n  CMD: {' '.join(cmd)}")
     if dry_run:
@@ -179,14 +187,16 @@ def run_registration(
 # STEP 2 — Evaluation
 # ===========================================================================
 
-def eval_csv_path(metric: str) -> Path:
-    return EVAL_DIR / f"eval_deformable_{metric}.csv"
+def eval_csv_path(metric: str, no_mask: bool = False) -> Path:
+    suffix = "_nomask" if no_mask else ""
+    return EVAL_DIR / f"eval_deformable_{metric}{suffix}.csv"
 
 
 def run_evaluation(
         metric: str,
         out_dir: Path,
         dry_run: bool,
+        no_mask: bool = False,
 ) -> bool:
     """
     Run evaluate_registration.py --all on one metric's registration output.
@@ -198,7 +208,7 @@ def run_evaluation(
         return False
 
     eval_script = str(_HERE_PAR / "evaluate_pipeline" / "evaluate_registration.py")
-    csv_out     = str(eval_csv_path(metric))
+    csv_out     = str(eval_csv_path(metric, no_mask))
     cmd = [
         sys.executable, eval_script,
         "--all",
@@ -424,6 +434,21 @@ def main() -> None:
         help="Use fixed_baseline_rigid_registered input instead of aligned.",
     )
     ap.add_argument(
+        "--split", choices=["all", "train", "test"], default="all",
+        help="Restrict registration to the train/test split from\n"
+             "compare_registrtaion/generate_split.py. Use 'test' to put every\n"
+             "arm of the ablation on the SAME studies the baselines were\n"
+             "evaluated on — otherwise the comparison is across disjoint\n"
+             "case sets and means nothing.",
+    )
+    ap.add_argument(
+        "--no-mask", action="store_true",
+        help="Control arm: evaluate the similarity metric over the WHOLE IMAGE\n"
+             "instead of restricting it to the organ mask. Registration output and\n"
+             "eval CSVs get a '_nomask' suffix, so the masked and whole-image arms\n"
+             "of the factorial coexist and can be compared directly.",
+    )
+    ap.add_argument(
         "--dry-run", action="store_true",
         help="Print commands but do not execute them.",
     )
@@ -445,7 +470,8 @@ def main() -> None:
     eval_status: Dict[str, bool] = {}
 
     for idx, metric in enumerate(metrics, 1):
-        out_dir = output_dir_for(metric, baseline=args.baseline)
+        out_dir = output_dir_for(metric, baseline=args.baseline,
+                                 no_mask=args.no_mask)
 
         print(f"\n{'━'*70}")
         print(f"[{idx}/{len(metrics)}]  {METRIC_LABEL.get(metric, metric)}")
@@ -463,6 +489,8 @@ def main() -> None:
                 no_field=args.no_field,
                 baseline=args.baseline,
                 dry_run=args.dry_run,
+                no_mask=args.no_mask,
+                split=args.split,
             )
             reg_status[metric] = ok
             if not ok:
@@ -479,6 +507,7 @@ def main() -> None:
                 metric=metric,
                 out_dir=out_dir,
                 dry_run=args.dry_run,
+                no_mask=args.no_mask,
             )
             eval_status[metric] = ok
         else:
