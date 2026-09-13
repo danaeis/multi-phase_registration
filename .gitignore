@@ -43,3 +43,9 @@ compare_registrtaion/deedsBCV/
 
 compare_registrtaion/run_logs/
 compare_registrtaion/.run_state
+
+# LaTeX build artifacts of main.tex
+main.aux
+main.out
+main.pdf
+main.synctex.gz
