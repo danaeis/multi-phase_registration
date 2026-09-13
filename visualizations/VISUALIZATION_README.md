@@ -218,3 +218,5 @@ python viz_05_centroid_distribution.py \
 | `fig5a_centroid_violin.png` | Evaluation — distribution |
 | `fig5b_centroid_waterfall.png` | Evaluation — per-study improvement |
 | `fig5c_centroid_heatmap.png` | Compact summary heatmap |
+
+> The slide deck these figures were made for is at `paper/slides/ct_registration_dml_style.pptx`.

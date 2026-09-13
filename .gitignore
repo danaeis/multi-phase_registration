@@ -44,7 +44,7 @@ compare_registrtaion/deedsBCV/
 compare_registrtaion/run_logs/
 compare_registrtaion/.run_state
 
-# LaTeX build artifacts of main.tex
+# LaTeX build artifacts of paper/main.tex (these patterns match in any directory)
 main.aux
 main.out
 main.pdf
