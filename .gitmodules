@@ -1,0 +1,4 @@
+[submodule "compare_registrtaion/deedsBCV"]
+	path = compare_registrtaion/deedsBCV
+	url = https://github.com/mattiaspaul/deedsBCV
+	ignore = untracked
