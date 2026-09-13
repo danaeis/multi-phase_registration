@@ -705,7 +705,7 @@ def setup_bspline(
     # ── Optimizer ─────────────────────────────────────────────────────────────
     reg.SetInterpolator(sitk.sitkLinear)
     reg.SetOptimizerAsLBFGSB(
-        gradientConvergenceTolerance=1e-5,
+        gradientConvergenceTolerance=1e-12,
         numberOfIterations=num_iterations,
         maximumNumberOfCorrections=5,
         maximumNumberOfFunctionEvaluations=num_iterations * 20,  # FIX: was *2 → too low
@@ -942,7 +942,7 @@ def register_study_deformable(
 
         prefix    = os.path.join(study_out, f"{study_id}_{sid}")
         out_vol   = f"{prefix}_deformable.nii.gz"
-        out_field = f"{prefix}_deformable_field.nii.gz"
+        out_field = f"{prefix}_deformable_dvf.nii.gz"
 
         if skip_existing and os.path.exists(out_vol):
             print(f"\n  ⏭  [{phase}] already exists — skip")
