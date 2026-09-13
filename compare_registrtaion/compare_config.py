@@ -165,6 +165,10 @@ BASELINE_ALGOS: Dict[str, BaselineAlgo] = {a.tag: a for a in [
                  "_rfull.nii.gz",  "_rfull_seg_reg.nii.gz",  False, None),
     BaselineAlgo("R_mmi",   "Rigid · MMI",
                  "_rmmi.nii.gz",   "_rmmi_seg_reg.nii.gz",   False, None),
+
+    BaselineAlgo("R_mind", "Rigid · MIND-NCC (mask)",
+                     "_rmind.nii.gz",  "_rmind_seg_reg.nii.gz",  False, None),
+
     # ── Off-the-shelf SOTA, native objectives, same eval ruler ───────────
     BaselineAlgo("B2_deeds", "DEEDS",
                  "_deeds.nii.gz",  "_deeds_seg_reg.nii.gz",  True, "_deeds_dvf.nii.gz"),
@@ -215,6 +219,7 @@ ROW_LABELS: Dict[str, str] = {
     "A4_pass01":             "A4   + Rigid P0+1 (Nelder-Mead)",
     "A5_pass012":            "A5   + Rigid P0+1+2 (Sobel gate)",
     "A6_bspline":            "A6   Full (+ B-spline)",
+    "R_mind":                "Rigid (MIND-NCC)",
     # Baseline pipeline — no z-align (isolates z-align contribution)
     "A3b_pass0_noalign":     "A3b  Rigid P0        [no z-align]",
     "A4b_pass01_noalign":    "A4b  Rigid P0+1      [no z-align]",

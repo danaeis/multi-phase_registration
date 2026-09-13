@@ -39,3 +39,7 @@ pipeline_logs/*
 
 
 compare_registrtaion/network_weights/*
+compare_registrtaion/deedsBCV/
+
+compare_registrtaion/run_logs/
+compare_registrtaion/.run_state

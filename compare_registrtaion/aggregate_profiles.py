@@ -31,6 +31,7 @@ ALGO_NAMES = {
     "R_sobel":        "Rigid (Sobel-NCC)",
     "R_full":         "Rigid (proposed)",
     "R_mmi":          "Rigid (MMI)",
+    "R_mind": "Rigid (MIND-NCC)",
     "B2_deeds":       "DEEDS",
     "B3_ants":        "ANTs-SyN",
     "B4_vxm":         "VoxelMorph-NMI",
@@ -39,6 +40,7 @@ ALGO_NAMES = {
     "A4_pass01":      "Rigid P0+1",
     "A5_pass012":     "Rigid P0+1+2",
     "A6_bspline":     "B-spline deformable",
+    
 }
 
 
