@@ -1193,6 +1193,12 @@ if __name__ == "__main__":
         "--split", choices=["all", "train", "test"], default="all",
         help="Restrict to the train/test split from compare_registrtaion/generate_split.py.",
     )
+    ap.add_argument(
+        "--out-dir", default=None,
+        help="Write outputs here instead of the default results directory.\n"
+             "Used by compare_registrtaion/measure_resources.py so re-measuring\n"
+             "cost never overwrites evaluated outputs.",
+    )
     args = ap.parse_args()
 
     # Resolve split filter
@@ -1211,6 +1217,8 @@ if __name__ == "__main__":
         out_dir += "_baseline"
     if args.no_mask:
         out_dir += "_nomask"
+    if args.out_dir:
+        out_dir = args.out_dir
 
     print(
         f"metric={args.metric}  grid={args.grid}mm  mode={mode}  "
