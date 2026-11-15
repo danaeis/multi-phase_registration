@@ -98,14 +98,18 @@ CONDITIONS: Dict[str, Condition] = {c.tag: c for c in [
     _C("A5_pass012",    RIGID_ALIGNED_DIR,  "_rigid2.nii.gz",        "_rigid2_seg_reg.nii.gz"),
     _C("A6_bspline",    RESULTS_DIR / "A6_bspline", "_bspline.nii.gz",
         "_bspline_seg_reg.nii.gz", deformable=True, dvf="_bspline_dvf.nii.gz"),
-    # _C("B1_elastix",    RESULTS_DIR / "B1_elastix", "_elastix.nii.gz",
-    #     "_elastix_seg_reg.nii.gz"),
-    # _C("B2_deeds",      RESULTS_DIR / "B2_deeds",   "_deeds.nii.gz",
-    #     "_deeds_seg_reg.nii.gz",   deformable=True, dvf="_deeds_dvf.nii.gz"),
-    # _C("B3_ants",       RESULTS_DIR / "B3_ants",    "_ants.nii.gz",
-    #     "_ants_seg_reg.nii.gz",    deformable=True, dvf="_ants_dvf.nii.gz"),
-    # _C("B4_vxm",        RESULTS_DIR / "B4_vxm",     "_vxm.nii.gz",
-    #     "_vxm_seg_reg.nii.gz",     deformable=True, dvf="_vxm_dvf.nii.gz"),
+    # Baselines. run_condition() skips any whose base_dir does not exist yet
+    # (evaluate_all.py:95), so leaving all four enabled costs nothing before
+    # their runners have produced output — and leaving them commented out is
+    # what left main.tex's comparison table empty.
+    _C("B1_elastix",    RESULTS_DIR / "B1_elastix", "_elastix.nii.gz",
+        "_elastix_seg_reg.nii.gz"),
+    _C("B2_deeds",      RESULTS_DIR / "B2_deeds",   "_deeds.nii.gz",
+        "_deeds_seg_reg.nii.gz",   deformable=True, dvf="_deeds_dvf.nii.gz"),
+    _C("B3_ants",       RESULTS_DIR / "B3_ants",    "_ants.nii.gz",
+        "_ants_seg_reg.nii.gz",    deformable=True, dvf="_ants_dvf.nii.gz"),
+    _C("B4_vxm",        RESULTS_DIR / "B4_vxm",     "_vxm.nii.gz",
+        "_vxm_seg_reg.nii.gz",     deformable=True, dvf="_vxm_dvf.nii.gz"),
 
     _C("A3b_pass0_noalign",  RIGID_BASELINE_DIR, "_rigid0.nii.gz", "_rigid0_seg_reg.nii.gz"),
     _C("A4b_pass01_noalign", RIGID_BASELINE_DIR, "_rigid1.nii.gz", "_rigid1_seg_reg.nii.gz"),
