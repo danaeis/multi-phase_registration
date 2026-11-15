@@ -4,10 +4,12 @@ Written 2026-11-15. Nothing has been executed; the full dataset lives on the rem
 server. **The copy-paste command sequence is in [WAW_TACE_RUNBOOK.md](WAW_TACE_RUNBOOK.md)** —
 this file is the reasoning behind it.
 
-The code the runbook calls is written and committed: `waw_tace/prepare_waw_tace.py`,
-`waw_tace/check_tumor_masks.py`, `compare_registrtaion/run_waw_tace.sh`, and the
-`MAIN_PATH` env override in the four `configs.py` files (§4.1). Still to write, and only
-if the §3.1 gate check clears: `evaluate_pipeline/evaluate_tumor.py` (§4.4).
+The code the runbook calls is written: `waw_tace/prepare_waw_tace.py`,
+`waw_tace/check_tumor_masks.py`, `compare_registrtaion/run_waw_tace.sh`,
+`compare_registrtaion/failure_rates.py`, the `--sample` flag on
+`compare_registrtaion/generate_split.py`, and the `MAIN_PATH` env override in the four
+`configs.py` files (§4.1). Still to write, and only if the §3.1 gate check clears:
+`evaluate_pipeline/evaluate_tumor.py` (§4.4).
 
 ## 0. Why this run exists
 
@@ -274,8 +276,10 @@ only the ones the external-validity argument rests on:
 | `R_full`, `R_mmi` | proposed rigid objective vs the standard one |
 | `B2_deeds`, `B3_ants`, `B5_unigradicon_io` | the three that tied or won on VinDr |
 
-Drop `R_organ`, `R_sobel`, `B4_vxm`, `B5_unigradicon` (no IO) and the `--input raw` arm
-unless a reviewer asks. Each dropped condition is ~200 study-pairs of compute.
+Drop `R_organ`, `R_sobel`, `B4_vxm` and `B5_unigradicon` (no IO). **Keep the `--input raw`
+arm** for the B-series: the crop contrast is `raw` → `baseline` and the headline transfer
+claim is `raw` → `aligned`, so without a raw tier neither can be re-tested here (see §5b).
+The saving comes from the cohort size instead.
 
 ### Stage 3 — evaluation
 
@@ -286,6 +290,72 @@ python ../evaluate_pipeline/evaluate_tumor.py --all        # if 3.1 cleared
 
 Then the two tables from §0, plus the slice-thickness stratification and the
 `excluded.csv` cohort table.
+
+## 5b. Failure rate, and the evaluation sample
+
+Two reporting requirements that shape how the grid is run.
+
+### Failure rate, not just median Dice
+
+The headline claim is that the front-end is a **failure-mode eliminator** — on VinDr it
+moved rigid MIND-NCC from 57% to 10% failure while barely touching the median, and the
+gain per engine tracks that engine's own raw failure rate (MIND-NCC 60.6% fail → +0.369;
+DEEDS 5.9% → +0.020; ANTs → n.s.). A median ± IQR table cannot show that, so
+`compare_registrtaion/failure_rates.py` reports it directly.
+
+A (study, phase, organ) triple fails if its eroded Dice is below 0.5 — reusing the
+threshold already in the manuscript rather than inventing a second one — **or** if the
+condition produced no output for it. The second clause matters more than it looks: a
+median computed over whatever a registrar survived flatters the registrar. This project
+has already hit that exact trap, with plain uniGradICON's crop-only run covering 176 of
+578 samples that turned out to be an easy subset (raw Dice 0.745 vs 0.590 for the rest).
+
+Denominator is the union of triples **any** condition evaluated, not the label-derived
+product of pairs × organs: TotalSegmentator legitimately finds no gallbladder in a patient
+who has had one removed, and charging every method for that is noise. But a triple some
+method produced is one this method could have, so a gap there is a real failure.
+
+Validated against the VinDr results already on the laptop: the per-evaluated failure rate
+reproduces the published numbers (DEEDS 3.8%, ANTs 9.9%, A4 13.5% against 13.4% on
+record), and both conditions the project records as unusable surface unprompted as low
+coverage — `R_full__raw` 3.1%, `B5_unigradicon__baseline` 26.2%.
+
+### With vs without the front-end, decomposed and paired
+
+Each algorithm runs on three input tiers, so the front-end splits into its two steps:
+
+| step | contrast | what VinDr found |
+|---|---|---|
+| crop | `raw` → `baseline` | carries the entire effect |
+| z-align | `baseline` → `aligned` | contributes nothing (−0.007 to +0.002), hurts standalone |
+| front-end | `raw` → `aligned` | the headline transfer result |
+
+Each is paired over shared triples: McNemar exact on discordant failures, Wilcoxon
+signed-rank on Dice where both tiers succeeded. Reporting both is deliberate — a front-end
+can leave the median untouched while removing the catastrophic tail, and the tail is what
+decides whether a pipeline is usable.
+
+Note this means the **`raw` input arm must be kept** for the B-series on WAW-TACE, which
+reverses the cut in §Stage 2 of the plan: without `raw` there is no crop contrast and the
+headline claim cannot be re-tested on the second cohort. Keep `--input all` for DEEDS,
+ANTs and uGI+IO; the saving has to come from the cohort instead.
+
+### One sample, drawn once, for everything
+
+To keep the grid affordable, `generate_split.py --sample N --sample_seed S` marks exactly
+N randomly chosen studies as `test`. Every runner and the evaluator already filter on
+`--split test`, so all algorithms and all states land on the identical studies.
+
+That is not merely convenient — it is required. The paired tests above compare conditions
+per (study, phase, organ); sampling per algorithm would compare methods on different data
+and the pairing would be void. Studies without the reference phase are excluded from the
+draw, since they have no fixed image. `splits/eval_sample.csv` records the seed, N, the
+eligible pool and the drawn IDs, so the sample is reproducible and reportable — state the
+seed in the paper.
+
+Power: VinDr reached p = 1.5e-6 for A6 vs A4 on 53 test studies, and the front-end effects
+are an order of magnitude larger (failure rate deltas of 20–47 points). N = 40 is ample;
+N = 40 also cuts A6 from ~180 h to ~36 h.
 
 ## 6. Compute and disk — the binding constraint
 

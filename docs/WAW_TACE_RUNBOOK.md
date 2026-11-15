@@ -24,6 +24,8 @@ them across:
 | `waw_tace/prepare_waw_tace.py` | **new** — converts WAW-TACE into a VinDr-shaped root |
 | `waw_tace/check_tumor_masks.py` | **new** — the 20 MB gate check (§3) |
 | `compare_registrtaion/run_waw_tace.sh` | **new** — registration grid, cut condition list |
+| `compare_registrtaion/failure_rates.py` | **new** — failure rate per condition + paired with/without-front-end contrast |
+| `compare_registrtaion/generate_split.py` | **changed** — `--sample N --sample_seed S` draws a fixed evaluation sample |
 | `{dcm2nii,alignment,registration,compare_registrtaion}/configs.py` | **changed** — `MAIN_PATH` now `os.environ.get("MAIN_PATH", <old default>)` |
 | `compare_registrtaion/check_progress.sh` | **changed** — honours `STATE_FILE` / `LOG_DIR` |
 
@@ -274,8 +276,28 @@ grep -c WARN $REPO/segmentation/seg_waw.log; ls $MAIN_PATH/ts_segmentations/*_se
 ```
 
 Split — WAW-TACE is **100% test**. Nothing is trained on it: VoxelMorph keeps its
-VinDr weights, because zero-shot transfer is the claim. `--test_ratio 1.0` marks every
-study `test` so the existing `--split test` plumbing works unchanged:
+VinDr weights, because zero-shot transfer is the claim.
+
+Draw the **evaluation sample** here, with a recorded seed. Every runner and the
+evaluator filter on `--split test`, so marking exactly N studies as `test` is what makes
+all algorithms and all states land on the identical studies:
+
+```bash
+cd $REPO/compare_registrtaion && $PYTHON generate_split.py --sample 40 --sample_seed 7
+```
+
+Pick N from the compute budget in §5 — 40 studies × ~2 moving phases × ~27 min ≈ 36 h for
+A6, against ~180 h for the full ~200. It writes `splits/eval_sample.csv` recording the
+seed, N, the eligible pool and the drawn study IDs, so the sample is reproducible and
+reportable. Studies with no non-contrast phase are excluded from the draw, since without
+a fixed image there is nothing to register and sampling one would quietly shrink N.
+
+Sample **once, globally** — never per algorithm. Each condition reading the same split is
+what keeps the with/without-front-end comparison paired per (study, phase, organ), which
+is what `failure_rates.py` tests in §8. Per-algorithm samples would compare methods on
+different data and the paired tests would be meaningless.
+
+To use every eligible study instead, drop `--sample` and pass `--test_ratio 1.0`:
 
 ```bash
 cd $REPO/compare_registrtaion && $PYTHON generate_split.py --test_ratio 1.0
@@ -312,9 +334,11 @@ tmux attach -t wawtace
 
 The script prints its cohort size and refuses to start without an absolute `MAIN_PATH` or
 a `labels.csv`. It runs the cut condition list from the plan (A1, A2, A3–A5, A3b–A5b, A6,
-A6b, R_full, R_mmi, B2 DEEDS, B3 ANTs, B5 uGI+IO-50 — aligned and baseline inputs, no
-`raw` arm) as seven parallel state-guarded jobs. Dropped versus the VinDr run: `R_organ`,
-`R_sobel`, `B4_vxm`, `B5_unigradicon` without IO.
+A6b, R_full, R_mmi, B2 DEEDS, B3 ANTs, B5 uGI+IO-50) as seven parallel state-guarded jobs.
+The B-series runs all three input tiers — raw, baseline, aligned — because the crop step
+is `raw` → `baseline` and the front-end claim is `raw` → `aligned`; §8's paired contrast
+needs both. Dropped versus the VinDr run: `R_organ`, `R_sobel`, `B4_vxm`, and
+`B5_unigradicon` without IO.
 
 Monitor:
 
@@ -341,6 +365,45 @@ cd $REPO/compare_registrtaion && $PYTHON eval_compare_conditions.py --all --spli
 ```bash
 ls $MAIN_PATH/all_baseline_algorithms/; column -s, -t < $MAIN_PATH/all_baseline_algorithms/comparison_table.csv 2>/dev/null | head -30
 ```
+
+### Failure rates, and performance with vs without the front-end
+
+```bash
+cd $REPO/compare_registrtaion && $PYTHON failure_rates.py --split test
+```
+
+`run_waw_tace.sh` already runs this at the end; the standalone call is for re-running
+after a threshold change. It answers both halves of the question directly:
+
+**Failure rate per condition** (`failure_rates.csv` / `.tex`). A (study, phase, organ)
+triple fails if its eroded Dice is below 0.5 — the threshold this project already reports
+— **or** if the method produced no output for it at all. That second clause is the point:
+the median ± IQR table silently rewards a registrar that crashes on hard cases, because
+its median is then computed over the easy remainder. This project has already been bitten
+by it (plain uniGradICON's crop-only run covers 176 of 578 samples, and those samples are
+an easy subset: raw Dice 0.745 vs 0.590 for the rest). The table prints `failure_pct`
+beside `failure_pct_of_evaluated`; a large gap between the two is the warning sign, and
+`coverage_pct` names it outright.
+
+**With vs without, paired** (`front_end_effect.csv`). Each algorithm ran on three input
+tiers, so the front-end decomposes into the two steps and the whole:
+
+| step | contrast |
+|---|---|
+| crop | `raw` → `baseline` |
+| z-align | `baseline` → `aligned` |
+| front-end | `raw` → `aligned` |
+
+Each is paired over the triples the two tiers share: McNemar exact on the discordant
+failures (did the step change failure?) and Wilcoxon signed-rank on Dice where both
+survived (did it change accuracy?). Both are reported because on this data they disagree
+informatively — the front-end is a failure-mode eliminator, so it moves the tail far more
+than the median. The A-series rows cover the same contrast for the pipeline's own stages.
+
+Verified against the VinDr results already on the laptop: `failure_pct_of_evaluated`
+reproduces the thesis's published failure rates (DEEDS 3.8%, ANTs 9.9%, A4 13.5% vs the
+13.4% on record), and the two conditions the project notes as unusable surface on their
+own as low `coverage_pct` — `R_full__raw` at 3.1% and `B5_unigradicon__baseline` at 26.2%.
 
 Then the two things that make this external validation rather than a second table:
 

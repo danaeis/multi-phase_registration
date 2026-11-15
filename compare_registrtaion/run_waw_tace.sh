@@ -20,9 +20,23 @@
 #        B2_deeds, B3_ants,
 #        B5_unigradicon_io              the three that tied/won on VinDr
 #
-#      Dropped: R_organ, R_sobel, B4_vxm, B5_unigradicon (no IO), and the
-#      --input raw arm. Each costs ~1 study-pair-set of compute and answers
-#      nothing a reviewer is asking of a second cohort.
+#      Dropped: R_organ, R_sobel, B4_vxm, B5_unigradicon (no IO).
+#
+#      The --input raw arm is KEPT for the B-series, deliberately. The headline
+#      transfer claim is the raw -> aligned contrast, and the crop step is
+#      raw -> baseline; without a raw tier neither can be re-tested on this
+#      cohort, which is the entire reason for the run. The saving comes from
+#      the cohort size instead (generate_split.py --sample N).
+#
+# EVALUATION SAMPLE
+#   Every job below runs with --split test, so the test split IS the sample.
+#   Draw it once, before starting, with a recorded seed:
+#       python generate_split.py --sample 40 --sample_seed 7
+#   That marks exactly 40 studies as "test" and writes splits/eval_sample.csv.
+#   Because every condition reads the same split, all algorithms and all states
+#   are measured on the identical studies — which is what keeps the comparison
+#   paired, and is the only honest way to cut compute. Sampling per algorithm
+#   would compare methods on different data.
 #
 # PREREQUISITES
 #   export MAIN_PATH=/abs/path/to/waw_tace/derived/     # trailing slash, ABSOLUTE
@@ -223,42 +237,48 @@ job_rigid_variants() {
     echo "[$(ts)] job_rigid_variants complete"
 }
 
-# ── B-series: aligned + baseline only (raw arm dropped) ──────────────────────
+# ── B-series: all three input tiers ──────────────────────────────────────────
+# raw / baseline / aligned give the two front-end steps separately:
+#   raw -> baseline  = the crop        (VinDr: carries the whole effect)
+#   baseline -> aligned = z-align      (VinDr: contributes nothing)
+#   raw -> aligned   = the front-end   (the headline claim)
+# failure_rates.py tests each one paired per (study, phase, organ).
 
 job_deeds() {
-    hdr "B2 DEEDS  (aligned + baseline)"
+    hdr "B2 DEEDS  (raw + baseline + aligned)"
     local sentinel="$LOG_DIR/.deeds_reg_done"; rm -f "$sentinel"
     local w; w=$(start_watcher "$sentinel" "$LOG_DIR/deeds_eval.log" \
-        B2_deeds__aligned B2_deeds__baseline -- --split test)
+        B2_deeds__aligned B2_deeds__baseline B2_deeds__raw -- --split test)
 
-    run_reg "deeds_both" "$LOG_DIR/deeds_reg.log" \
-        $PYTHON run_deeds.py --input both --split test || true
+    run_reg "deeds_all" "$LOG_DIR/deeds_reg.log" \
+        $PYTHON run_deeds.py --input all --split test || true
 
     touch "$sentinel"; wait "$w"
     echo "[$(ts)] job_deeds complete"
 }
 
 job_ants() {
-    hdr "B3 ANTs-SyN  (aligned + baseline)"
+    hdr "B3 ANTs-SyN  (raw + baseline + aligned)"
     local sentinel="$LOG_DIR/.ants_reg_done"; rm -f "$sentinel"
     local w; w=$(start_watcher "$sentinel" "$LOG_DIR/ants_eval.log" \
-        B3_ants__aligned B3_ants__baseline -- --split test)
+        B3_ants__aligned B3_ants__baseline B3_ants__raw -- --split test)
 
-    run_reg "ants_both" "$LOG_DIR/ants_reg.log" \
-        $PYTHON run_ants.py --input both --split test || true
+    run_reg "ants_all" "$LOG_DIR/ants_reg.log" \
+        $PYTHON run_ants.py --input all --split test || true
 
     touch "$sentinel"; wait "$w"
     echo "[$(ts)] job_ants complete"
 }
 
 job_unigradicon_io() {
-    hdr "B5 uniGradICON + IO-50  (aligned + baseline)"
+    hdr "B5 uniGradICON + IO-50  (raw + baseline + aligned)"
     local sentinel="$LOG_DIR/.ugi_io_reg_done"; rm -f "$sentinel"
     local w; w=$(start_watcher "$sentinel" "$LOG_DIR/unigradicon_io_eval.log" \
-        B5_unigradicon_io__aligned B5_unigradicon_io__baseline -- --split test)
+        B5_unigradicon_io__aligned B5_unigradicon_io__baseline \
+        B5_unigradicon_io__raw -- --split test)
 
-    run_reg "ugi_io_both" "$LOG_DIR/unigradicon_io_reg.log" \
-        $PYTHON run_unigradicon.py --input both --split test \
+    run_reg "ugi_io_all" "$LOG_DIR/unigradicon_io_reg.log" \
+        $PYTHON run_unigradicon.py --input all --split test \
             --algo_tag B5_unigradicon_io --io_steps 50 || true
 
     touch "$sentinel"; wait "$w"
@@ -315,6 +335,15 @@ if $PYTHON eval_compare_conditions.py --all --split test \
     echo "[$(ts)] DONE: final table → $LOG_DIR/final_eval.log"
 else
     echo "[$(ts)] FAIL: final table (see $LOG_DIR/final_eval.log)"; FAIL=1
+fi
+
+echo ""
+echo "[$(ts)] Failure rates + paired with/without-front-end contrast ..."
+if $PYTHON failure_rates.py --split test >> "$LOG_DIR/failure_rates.log" 2>&1; then
+    echo "[$(ts)] DONE: failure rates → $LOG_DIR/failure_rates.log"
+    tail -40 "$LOG_DIR/failure_rates.log"
+else
+    echo "[$(ts)] FAIL: failure rates (see $LOG_DIR/failure_rates.log)"; FAIL=1
 fi
 
 echo ""
