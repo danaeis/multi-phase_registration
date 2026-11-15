@@ -1,0 +1,335 @@
+# WAW-TACE external validation — execution plan
+
+Written 2026-11-15. Nothing has been executed; the full dataset lives on the remote
+server. **The copy-paste command sequence is in [WAW_TACE_RUNBOOK.md](WAW_TACE_RUNBOOK.md)** —
+this file is the reasoning behind it.
+
+The code the runbook calls is written and committed: `waw_tace/prepare_waw_tace.py`,
+`waw_tace/check_tumor_masks.py`, `compare_registrtaion/run_waw_tace.sh`, and the
+`MAIN_PATH` env override in the four `configs.py` files (§4.1). Still to write, and only
+if the §3.1 gate check clears: `evaluate_pipeline/evaluate_tumor.py` (§4.4).
+
+## 0. Why this run exists
+
+The defensible contribution of this work is the **front-end transfer result**: crop +
+z-align (A1→A2) improves every downstream registrar, including off-the-shelf SOTA, and
+the deformable stage (A6) only ties ANTs / uGI+IO. A single-cohort (VinDr) result cannot
+support that claim for publication, because the front-end is tuned on the same intensity
+and geometry distribution it is evaluated on.
+
+WAW-TACE is the right second cohort:
+
+- independent institution (Warsaw), independent scanners, different acquisition protocol;
+- same task shape — multiphase abdominal CT, non-contrast reference + contrast phases;
+- it ships **hand-drawn HCC tumour masks**, which are labels the registration objective
+  never sees. VinDr evaluation uses TotalSegmentator masks, which the organ-centroid /
+  eDice objective partly optimises — a reviewer will call that circular. Tumour Dice on
+  WAW-TACE closes that hole.
+
+So the run has two deliverables, in priority order:
+
+1. **Transfer table** — A1/A2/A5/A6 + the strongest baselines, re-measured on WAW-TACE,
+   showing the A1→A2 front-end gain reproduces out-of-distribution.
+2. **Independent-label table** — tumour Dice / tumour centroid error on the subset with
+   tumour masks in two or more phases, as an objective-independent ruler.
+
+Deliverable 2 is what makes this a paper rather than a second appendix table. Confirm it
+is feasible before committing compute (§3, step 1).
+
+## 1. What the sample data actually is
+
+Local sample: `/Users/macbook/develope/thesis/ncct_cect/waw_tace/source/` — 13 case
+folders, 27 scans, named `{case}/{case}_{phase}_scan.nii.gz`.
+
+Phase codes (confirmed against the Zenodo record, not inferred):
+
+| code | phase | pipeline `Label` to use |
+|---|---|---|
+| 0 | native / precontrast | `Non-contrast` |
+| 1 | late arterial | `Arterial` |
+| 2 | portal venous | `Venous` |
+| 3 | delayed | `Delayed` |
+
+Keep those exact strings. `Non-contrast` is hardcoded as the fixed reference in
+`registration/register_fixed.py:901`, `registration/deformable_registration_v2.py:883`
+and `alignment/align_and_crop.py` (`find_noncontrast_series`). Matching VinDr's
+vocabulary means zero code change there. VinDr already carries a 4th label (`Other`,
+102 rows), so `Delayed` flows through the label-agnostic loops without special casing.
+
+### Geometry — this is the part that needs work
+
+Measured across all 27 sample scans:
+
+- Orientation is **LAS**, not the LPS the pipeline standardises to. Reorientation required.
+- In-plane spacing 0.613–0.922 mm; all 512×512.
+- **Slice thickness 1.25–5.0 mm**, varying *within* a patient (case 10: 1.25 / 2.5 / 2.5).
+- HU floor is **−3024** on 24 of 27 scans — the same scanner sentinel the DICOM stage
+  already clips. Ceiling up to 3071.
+- Some scans are stored `float64` (2.5× the disk of `int16` for no information).
+
+The existing standardisation (`dcm2nii/dicom_processor.py`: LPS reorient → 1.5³ resample
+with −1024 fill → clip to [−1024, 3000]) is exactly right for this data, but it is wired
+to a DICOM reader. It needs a NIfTI-input sibling (§4).
+
+Resampling 5.0 mm → 1.5 mm z is a 3.3× upsample and is not free. Record native z-spacing
+per series in the metadata sidecar and **stratify the final results by slice thickness**
+(≤2.5 mm vs >2.5 mm). If the front-end gain holds in both strata that is a stronger
+result than hiding the variable; if it does not, that is a finding, not a failure.
+
+### Phase availability — the real cohort size
+
+Not every patient has every phase, and the gaps are not at the end. Sample:
+
+| case | phases present | usable? |
+|---|---|---|
+| 10, 23 | 0,1,2,3 | yes |
+| 2, 29, 60 | 0,2,3 | yes |
+| 21 | 0,1,2 | yes |
+| 24 | 0,1 | yes |
+| 25 | 1,2,3 | **no — no NC reference** |
+| 20 | 2 | no |
+| 28 | 1 | no |
+| 7, 26, 27 | *(empty folders)* | no |
+
+7 of 13 usable in the sample. Full dataset: 233 patients, 200 with a precontrast phase,
+so expect **~200 usable studies** — against VinDr's 183 NC studies / 53 test studies.
+Comparable cohort, slightly larger.
+
+Usability rule for `labels.csv`: keep a study iff it has phase 0 **and** at least one of
+phase 1 / 2. Everything else is dropped with a logged reason.
+
+## 2. Design decision: one pipeline, two dataset roots
+
+Do **not** fork the pipeline for WAW-TACE. The publication claim is that the front-end
+transfers; that claim is only credible if the same code runs on both cohorts. So:
+
+- WAW-TACE becomes a second `MAIN_PATH` root, laid out identically to `vindr_ds/`:
+  `nifti_unprocessed_volumes/`, `ts_segmentations/`, `labels.csv`, `splits/`, …
+- One new adapter script converts `source/{case}/{case}_{p}_scan.nii.gz` into exactly the
+  artefacts the DICOM stage would have produced.
+- Every stage from segmentation onward runs unchanged, selected by `MAIN_PATH`.
+
+### Study / series ID scheme — `waw0024` / `p0`
+
+Not the raw `24` / `0`. Three reasons, all of them bugs if ignored:
+
+1. `pd.read_csv` types a column of `24`, `25`, `60` as **int64**. `labels_df[labels_df["StudyInstanceUID"] == study]` compares against `os.listdir` strings and silently
+   matches nothing — every study skipped, no error.
+2. `alignment/align_and_crop.py:82` globs `*{study_id}*{series_id}*standardized.nii.gz`.
+   With `study=2`, `series=0` that matches most of the cohort.
+3. Zero-padding to a fixed width stops `waw002` matching inside `waw0024`.
+
+So: `study_id = waw%04d`, `series_id = p{0..3}`. No underscores inside either token —
+`segmentation/run_segmentation.sh` splits the filename on `_` to recover study and series.
+
+## 3. Blocking decisions — settle these before any compute
+
+1. **Does the tumour-mask evaluation have enough cases?** Download
+   `ct_hcc_metadata_v2.csv` (16 kB) and `tumor_masks_wawtace_v1_08_05_2024.zip` (2.3 MB)
+   first and count patients with tumour masks in ≥2 phases, of which one is phase 0.
+   Masks were drawn on the phase where the lesion was most distinct, so single-phase
+   patients are useless for a registration Dice. If that count is under ~25, deliverable 2
+   degrades to a qualitative figure and the paper leans on deliverable 1 alone. **This is
+   a 20 MB download and an afternoon of counting — do it before the 48 GB.**
+2. **Organ masks: re-run TotalSegmentator, or use the shipped ones?** The record ships
+   1.0 GB of per-phase TotalSegmentator organ masks. Recommendation: **re-run TS on the
+   standardised volumes**, as VinDr did. The shipped masks are in native anisotropic
+   geometry (needing nearest-neighbour resampling that will not agree with the CT
+   interpolation), and `segmentation/combine_masks.py` expects per-organ files from a
+   specific TS version — a version mismatch in organ naming (`vertebrae_L1`, per-lobe
+   lungs) would silently empty parts of `seg_reg`. Use the shipped masks only as a
+   sanity cross-check on a handful of cases. If GPU time turns out to be the binding
+   constraint, revisit.
+3. **Delayed phase in or out?** Recommendation: **primary run on phases 0/1/2 only**, for
+   a direct column-for-column comparison against the VinDr table; `Delayed` carried in
+   `labels.csv` but excluded from the headline numbers, then reported as a secondary
+   4-phase robustness row. Mixing a phase VinDr never had into the headline table
+   invites "the cohorts aren't comparable".
+4. **No training on WAW-TACE.** VoxelMorph is the only trained component. Evaluate the
+   **VinDr-trained** weights zero-shot. That is the transfer claim; retraining on
+   WAW-TACE answers a different and weaker question. So WAW-TACE is 100% test: generate
+   the split with every study marked `test` so the `--split test` plumbing works unchanged.
+5. **Where does this run?** Not locally — see §6.
+
+## 4. Code changes required
+
+Deliberately small. Anything larger than this list means the "same pipeline" claim is
+getting shaky.
+
+### 4.1 Make `MAIN_PATH` overridable (4 one-line edits)
+
+`dcm2nii/configs.py`, `alignment/configs.py`, `registration/configs.py`,
+`compare_registrtaion/configs.py` all hardcode the VinDr root. Change each to:
+
+```python
+import os
+MAIN_PATH = os.environ.get("MAIN_PATH", '../../ncct_cect/vindr_ds/')
+```
+
+`compare_registrtaion/compare_config.py` and `evaluate_pipeline/config.py` already prefer
+`configs.MAIN_PATH` with an env fallback, so they inherit this for free. After the edit,
+`MAIN_PATH=../../ncct_cect/waw_tace/derived/` selects the cohort for every stage.
+
+### 4.2 New: `waw_tace/prepare_waw_tace.py`
+
+The only genuinely new code. Inputs `source/`, outputs a VinDr-shaped root.
+
+Per `source/{case}/{case}_{p}_scan.nii.gz`:
+
+1. Read with SimpleITK; reorient LAS → LPS (`StandardizedDICOMProcessor.reorient_to_lps`).
+2. Resample to 1.5³ mm, linear, fill `-1024` (`resample_to_target_spacing`). Do not
+   reimplement the fill value — that `-1024` choice is load-bearing per its own comment.
+3. Clip to [−1024, 3000] (`clip_hu_range`, which also casts to **float32** — matching the
+   VinDr volumes on disk, which are float32, not int16).
+4. Write `nifti_unprocessed_volumes/waw{case:04d}_p{p}_standardized.nii.gz`.
+5. Write `..._standardized_metadata.txt` in the existing format, **plus native in-plane
+   and z spacing** so the thickness stratification in §1 is possible later.
+
+All three geometry methods are called on `StandardizedDICOMProcessor` rather than copied,
+so the cohorts cannot drift apart. That class imports `pydicom` at module level, so
+pydicom must be installed even though no DICOM is read.
+
+Then emit:
+
+- `labels.csv` with `StudyInstanceUID,SeriesInstanceUID,Label` = `waw0024,p0,Non-contrast`,
+  only for studies passing the §1 usability rule;
+- `excluded.csv` — one row per dropped case with the reason (no NC, single phase, empty
+  folder, unreadable). This table goes in the paper's data section.
+
+Flags: `--source`, `--out`, `--cases`, `--phases 0 1 2`, `--workers`, `--overwrite`,
+`--report-only`, `--dry-run`.
+
+### 4.3 New: `waw_tace/prepare_tumor_masks.py` (gated on decision 3.1)
+
+Resample each `{case}_{p}_{i}_tumor_seg` into the standardised grid with
+**nearest-neighbour**, merge per-case tumour indices into one label volume, write to
+`tumor_masks/waw{case:04d}_p{p}_tumor.nii.gz`. Keep it out of `seg_reg` — the whole point
+is that no registrar ever sees it.
+
+### 4.4 New: `evaluate_pipeline/evaluate_tumor.py` (gated on decision 3.1)
+
+Mirrors `evaluate_registration.py`'s structure but with one label and no erosion:
+tumour Dice, tumour centroid displacement (mm), one row per (study, phase, condition).
+It applies the same stored transform each condition already wrote, so it needs no
+re-registration.
+
+### 4.5 Minor: visualisation phase order
+
+`visualizations/viz_01_phase_alignment.py:64` and `viz_02_hu_histograms.py:71` hardcode
+`PHASE_ORDER = ["Non-contrast", "Arterial", "Venous"]`. Append `"Delayed"` with a colour
+when the secondary 4-phase run is figured. Not needed for the primary run.
+
+## 5. Execution order
+
+### Stage 0 — local smoke test, on the 13-case sample (do this first)
+
+The point is to shake out the adapter and the ID scheme on data that fits on the laptop,
+not to produce numbers.
+
+```bash
+export MAIN_PATH=../../ncct_cect/waw_tace/derived/
+python waw_tace/prepare_waw_tace.py --source ../ncct_cect/waw_tace/source --phases 0 1 2
+```
+
+Check, before going further:
+
+- `labels.csv` has 7 studies (10, 2, 21, 23, 24, 29, 60), `excluded.csv` has 6 with reasons;
+- every standardised volume is 1.5³, LPS, `int16`, HU in [−1024, 3000];
+- study IDs survive a `pd.read_csv` round-trip as `str`, not `int64`.
+
+Then one study end to end — TotalSegmentator → `combine_masks` → align → rigid:
+
+```bash
+cd segmentation && bash run_segmentation.sh          # ~10 min/volume on CPU
+cd ../alignment  && python align_and_crop.py waw0010 --new-layout
+cd ../registration && python register_fixed.py waw0010 --skip
+```
+
+Watch specifically for: the `*{study}*{series}*` glob in `align_and_crop.py` resolving to
+exactly one file per call, and `combine_masks.py` sanity-passing (it exits 2 on a sparse
+`seg_reg`, which is also the honest answer if TS struggles on 5 mm slices).
+
+### Stage 1 — full data, on the server
+
+```
+download (48 GB, CC BY 4.0) → unzip 4 scan parts → prepare_waw_tace.py --all
+  → run_segmentation.sh  (~200 studies × 3 phases ≈ 600 TS runs)
+  → generate_split.py --test_ratio 1.0        # everything is test
+  → align_and_crop.py --all --new-layout      # A2 aligned
+  → align_and_crop.py --all --new-layout --baseline   # A1 crop-only
+```
+
+### Stage 2 — registration grid
+
+Reuse `compare_registrtaion/run_all_resume.sh` as-is; it is already resumable and
+state-guarded. **But cut the condition list.** VinDr ran ~30 conditions; WAW-TACE needs
+only the ones the external-validity argument rests on:
+
+| keep | why |
+|---|---|
+| `A1_crop_only`, `A2_zalign` | the front-end gain itself — the headline |
+| `A5_pass012` | best rigid, cheap |
+| `A6_bspline` | the full proposed method |
+| `A3b/A4b/A5b_noalign` | isolates z-align out of distribution |
+| `R_full`, `R_mmi` | proposed rigid objective vs the standard one |
+| `B2_deeds`, `B3_ants`, `B5_unigradicon_io` | the three that tied or won on VinDr |
+
+Drop `R_organ`, `R_sobel`, `B4_vxm`, `B5_unigradicon` (no IO) and the `--input raw` arm
+unless a reviewer asks. Each dropped condition is ~200 study-pairs of compute.
+
+### Stage 3 — evaluation
+
+```bash
+cd compare_registrtaion && python eval_compare_conditions.py --all --split test
+python ../evaluate_pipeline/evaluate_tumor.py --all        # if 3.1 cleared
+```
+
+Then the two tables from §0, plus the slice-thickness stratification and the
+`excluded.csv` cohort table.
+
+## 6. Compute and disk — the binding constraint
+
+**This cannot run on the laptop.** 23 GB free on `/System/Volumes/Data`; the download
+alone is 48 GB. Local scope is Stage 0 only (sample ≈ 1.2 GB standardised + segs).
+
+Server budget, ~200 studies × 3 phases = 600 series:
+
+| item | estimate |
+|---|---|
+| raw download + unzip | ~100 GB (delete zips after) |
+| standardised volumes | 600 × ~44 MB ≈ 26 GB |
+| `seg_full` + `seg_reg` | ≈ 50 GB |
+| A1 + A2 crops | ≈ 50 GB |
+| 11 conditions × warped vol + seg + DVF | ≈ 400–600 GB |
+| **total** | **~0.8 TB** |
+
+Time: A6 B-spline is ~27 min/phase (measured on VinDr). 200 studies × 2 moving phases
+× 27 min ≈ **180 h single-threaded** — the dominant cost by far, and DEEDS/ANTs are the
+same order. `run_all_resume.sh` already runs the jobs in parallel; even so, plan on
+1–2 weeks wall-clock on the current server.
+
+**If that does not fit the publication timeline**, cut the cohort, not the conditions:
+sample **~60 studies** stratified by phase availability and slice thickness. VinDr reached
+p = 1.5e-6 on 53 test studies, so 60 is ample power for the front-end effect, and it
+brings A6 to ~54 h. Decide this explicitly and state the sampling rule in the paper —
+a stratified 60 is defensible; a quietly truncated 60 is not.
+
+## 7. Risks
+
+| risk | mitigation |
+|---|---|
+| Tumour masks mostly single-phase → deliverable 2 dies | check first, 20 MB (§3.1) |
+| TotalSegmentator degrades on 5 mm slices → sparse `seg_reg` | `combine_masks` already exits 2; stratify by thickness, report the failure rate |
+| Numeric study IDs silently match nothing | `waw%04d` / `p{n}` scheme (§2) |
+| Front-end gain does **not** transfer | that is a publishable negative with the geometry data to explain it; do not hide it |
+| Compute overruns the timeline | stratified 60-study cohort decided up front, not mid-run |
+
+## 8. Suggested order of work
+
+1. Download metadata + tumour masks (20 MB); settle decision 3.1. ← start here
+2. Write `prepare_waw_tace.py`; run Stage 0 on the local sample.
+3. Make the 4 `MAIN_PATH` edits; confirm VinDr still runs unchanged (regression check).
+4. Settle decisions 3.2–3.5, including cohort size, in writing.
+5. Server: download, prepare, segment, align.
+6. Registration grid on the cut condition list.
+7. Evaluation, tumour table, stratification, cohort table.

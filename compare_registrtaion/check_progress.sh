@@ -8,6 +8,10 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 PYTHON="${PYTHON:-python3}"
+# Overridable so the WAW-TACE run (run_waw_tace.sh) reports on its own
+# state file and logs:  STATE_FILE=.run_state_waw LOG_DIR=run_logs_waw
+STATE_FILE="${STATE_FILE:-.run_state}"
+LOG_DIR="${LOG_DIR:-run_logs}"
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
@@ -16,13 +20,13 @@ echo "════════════════════════�
 
 # ── State file ────────────────────────────────────────────────────────────────
 echo ""
-if [ -f .run_state ] && [ -s .run_state ]; then
-    echo "  Completed steps (.run_state):"
+if [ -f "$STATE_FILE" ] && [ -s "$STATE_FILE" ]; then
+    echo "  Completed steps ($STATE_FILE):"
     while IFS= read -r line; do
         echo "    ✓ $line"
-    done < .run_state
+    done < "$STATE_FILE"
 else
-    echo "  .run_state is empty (no steps completed yet)"
+    echo "  $STATE_FILE is empty (no steps completed yet)"
 fi
 
 # ── Running PIDs ──────────────────────────────────────────────────────────────
@@ -81,10 +85,10 @@ for prefix, items in algo_groups.items():
 PYEOF
 
 # ── Recent log tails ──────────────────────────────────────────────────────────
-if [ -d run_logs ]; then
+if [ -d "$LOG_DIR" ]; then
     echo ""
     echo "  Recent log activity:"
-    for log in run_logs/job_deeds.log run_logs/job_ants.log run_logs/job_ugi.log run_logs/job_a6.log; do
+    for log in "$LOG_DIR"/job_*.log; do
         if [ -f "$log" ]; then
             last=$(tail -1 "$log" 2>/dev/null)
             name=$(basename "$log" .log)

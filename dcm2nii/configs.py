@@ -1,7 +1,8 @@
-
-
+import os
 # --- path CONFIG ---
-MAIN_PATH = '../ncct_cect/vindr_ds/'
+# Dataset root. Override to run the same pipeline on another cohort:
+#   export MAIN_PATH=../../ncct_cect/waw_tace/derived/
+MAIN_PATH = os.environ.get('MAIN_PATH', '../ncct_cect/vindr_ds/')
 BATCH_DIR = MAIN_PATH + 'main_batches'
 LABELS_CSV = MAIN_PATH + 'labels.csv'
 CACHE_PATH = MAIN_PATH + 'cached_vindr_dicom.pkl'
