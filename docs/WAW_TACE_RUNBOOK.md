@@ -15,9 +15,8 @@ server has — §2 verifies that.
 
 ## 0. What ships with this runbook
 
-Four new/changed things. They are written and syntax-checked but **not yet
-committed or pushed** — do that from the laptop before §2's `git pull`, or `scp`
-them across:
+These are committed and pushed to `danaeis/multi-phase_registration` `main`
+(f2d99c3). The server cannot reach GitHub, so §2 moves them across as a bundle:
 
 | file | what it is |
 |---|---|
@@ -51,11 +50,49 @@ place in each stage. `run_waw_tace.sh` refuses to start on a relative `MAIN_PATH
 
 Put those four lines in `~/.wawtace_env` and `source` it in every tmux pane.
 
-## 2. Get the code and check the environment
+## 2. Get the code onto the server
+
+**The server has no internet, so `git pull` from GitHub will not work.** Code reaches it
+only through a bundle you transfer. On the laptop (canonical clone):
 
 ```bash
-cd $REPO && git pull
+cd /Users/macbook/develope/thesis/multi-phase_registration && git pull --ff-only
 ```
+
+```bash
+mkdir -p /Users/macbook/develope/thesis/transfer && cd /Users/macbook/develope/thesis/multi-phase_registration && git bundle create /Users/macbook/develope/thesis/transfer/multi-phase_registration.bundle main server-thesis-results
+```
+
+Move that bundle to the server by whatever route you normally use, then on the server —
+clearing the uncommitted B-spline edit first, which would otherwise block the
+fast-forward:
+
+```bash
+cd $REPO && git status --short
+```
+
+```bash
+cd $REPO && git checkout -- registration/deformable_registration_v2.py
+```
+
+```bash
+cd $REPO && git fetch /path/to/multi-phase_registration.bundle main:refs/remotes/origin/main && git switch main && git merge --ff-only refs/remotes/origin/main
+```
+
+Confirm the WAW-TACE files arrived and that the B-spline fixes are the ones on disk:
+
+```bash
+cd $REPO && ls waw_tace/ compare_registrtaion/run_waw_tace.sh compare_registrtaion/failure_rates.py && grep -n "gradientConvergenceTolerance\|_deformable_dvf" registration/deformable_registration_v2.py
+```
+
+`gradientConvergenceTolerance=1e-12` and `_deformable_dvf.nii.gz` are the fixed values; if
+you see `1e-5` or `_deformable_field`, the fast-forward did not take.
+
+Do **not** rsync the repo tree onto the server: the laptop's `deedsBCV` binaries are macOS
+arm64 and would clobber the Linux builds, and `--delete` would wipe server-only ignored
+files such as the uniGradICON weights.
+
+## 2b. Check the environment
 
 ```bash
 cd $REPO && $PYTHON -c "
@@ -86,11 +123,18 @@ This decides whether the independent-label (tumour Dice) table is viable, which 
 part that answers "your Dice is circular — the objective optimises the same masks you
 evaluate". Do not skip it to save an afternoon.
 
+**Download where there is internet, not on the server** — it has none (§2). These two
+files are 20 MB, so run the `curl` on the laptop and move them across:
+
 ```bash
-mkdir -p $DATA/raw && cd $DATA/raw
+mkdir -p ~/Downloads/wawtace && cd ~/Downloads/wawtace
 curl -L -O "https://zenodo.org/records/12741586/files/ct_hcc_metadata_v2.csv?download=1"
 curl -L -O "https://zenodo.org/records/12741586/files/tumor_masks_wawtace_v1_08_05_2024.zip?download=1"
 ```
+
+The gate check itself is pure Python over filenames, so it can run on the laptop too —
+that is the cheapest place to settle this decision. Substitute your own paths for
+`$DATA/raw` and `$DATA/tumor_masks` below if you do.
 
 ```bash
 cd $DATA/raw && mv 'ct_hcc_metadata_v2.csv?download=1' ct_hcc_metadata_v2.csv 2>/dev/null; mv 'tumor_masks_wawtace_v1_08_05_2024.zip?download=1' tumor_masks_wawtace_v1_08_05_2024.zip 2>/dev/null; ls -lh
@@ -123,13 +167,29 @@ source and should be cross-checked against what §5 discovers on disk.
 
 ## 4. Download and extract the scans
 
+**This is the step with a real logistical problem, and it needs your decision.** The four
+scan archives are 48 GB; the server has no internet, and the laptop has ~23 GB free. So
+neither machine can do this alone on its own disk. Pick a route before starting:
+
+- an external drive on the laptop — download there, then transfer to the server;
+- a third machine with internet and disk that can reach the server;
+- a proxy or mirror on the server's network, if one exists for data (GitHub is blocked,
+  but your network may differ for other hosts — worth checking before assuming);
+- one archive at a time through the laptop: download, transfer, delete, repeat. Each part
+  is 10.4–13.5 GB, which fits in 23 GB one at a time.
+
+The last option needs no new hardware and is the fallback if nothing else is available.
+
+Wherever it runs, the download itself is:
+
 ```bash
 cd $DATA/raw && for i in 1 2 3 4; do
   curl -L -C - -O "https://zenodo.org/records/12741586/files/ct_scans_${i}_4_wawtace_09_05_24.zip?download=1"
 done
 ```
 
-`-C -` resumes a partial transfer; re-run the loop if it drops. 48 GB total.
+`-C -` resumes a partial transfer; re-run the loop if it drops. 48 GB total. Everything
+from §5 onward runs on the server, where the extracted `source/` lives.
 
 ```bash
 cd $DATA/raw && for f in ct_scans_*.zip*; do mv "$f" "${f%%\?*}"; done; ls -lh
@@ -443,9 +503,11 @@ cd $REPO/compare_registrtaion && env -u MAIN_PATH STATE_FILE=.run_state bash che
 
 ## 10. Order of work
 
-1. §1–2 paths and environment.
-2. §3 gate check — 20 MB. **Settle the tumour-mask decision before downloading 48 GB.**
-3. §4 download and extract.
+1. §1 paths; §2 bundle the code to the server (no `git pull` there); §2b environment.
+2. §3 gate check — 20 MB, runnable on the laptop. **Settle the tumour-mask decision
+   before moving 48 GB anywhere.**
+3. §4 decide the download route (the server has no internet and the laptop has ~23 GB
+   free), then download and extract.
 4. §5 convert, verify, **and decide the cohort size**.
 5. §6 segmentation (the GPU-bound stretch), split, alignment.
 6. §7 registration grid.
