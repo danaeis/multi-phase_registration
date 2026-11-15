@@ -3,13 +3,14 @@
 Copy-paste commands for the remote server. The reasoning behind the choices is in
 [WAW_TACE_PLAN.md](WAW_TACE_PLAN.md); this file is just the sequence.
 
-Written 2026-11-15. Nothing here has been executed — the laptop has 23 GB free and
-the download is 48 GB, so every step below is server-side.
+Written 2026-11-15, corrected after first contact with the server. Nothing in §3 onward
+has been executed yet. The code is on the server as of `daebd95` (§2), and the four
+WAW-TACE scan archives were **already downloaded** there (§4) — 44 GB, still zipped.
 
-**Paths I could not verify.** `$REPO` is guessed from the `export DEEDS_BIN=...` comment
-at the bottom of `compare_registrtaion/_common.py`; `$DATA` is a placeholder. Fix both in
-§1 before running anything. Likewise I could not check which Python packages or GPUs the
-server has — §2 verifies that.
+`$REPO` is confirmed as
+`/media/external20/saeedeh_danaei/sample_data_reg/multi-phase_registration` (not the
+older `data_reg_pipeline` clone beside it — see §2). `$DATA` is still yours to choose in
+§1. Which Python packages and GPUs the server has is unverified — §2b checks that.
 
 ---
 
@@ -52,45 +53,47 @@ Put those four lines in `~/.wawtace_env` and `source` it in every tmux pane.
 
 ## 2. Get the code onto the server
 
-**The server has no internet, so `git pull` from GitHub will not work.** Code reaches it
-only through a bundle you transfer. On the laptop (canonical clone):
+The server reaches GitHub over **HTTPS through a proxy**, but **not over SSH** — ssh gets
+`Could not resolve hostname github.com` because there is no direct DNS, while git's HTTPS
+traffic resolves on the proxy side. So the clone's remote must be an HTTPS URL. Done once:
 
 ```bash
-cd /Users/macbook/develope/thesis/multi-phase_registration && git pull --ff-only
+cd $REPO && git remote set-url origin https://github.com/danaeis/multi-phase_registration.git
 ```
 
 ```bash
-mkdir -p /Users/macbook/develope/thesis/transfer && cd /Users/macbook/develope/thesis/multi-phase_registration && git bundle create /Users/macbook/develope/thesis/transfer/multi-phase_registration.bundle main server-thesis-results
+cd $REPO && git status --short && git fetch origin && git pull --ff-only
 ```
 
-Move that bundle to the server by whatever route you normally use, then on the server —
-clearing the uncommitted B-spline edit first, which would otherwise block the
-fast-forward:
+Check `git status --short` first and deal with anything it lists, because two kinds of
+local state will stop the merge:
+
+- an **untracked** file that the incoming commits also add — git refuses rather than
+  overwrite it. Move it aside, pull, then `diff` the two and delete the copy if identical.
+  (`compare_registrtaion/measure_resources.py` hit exactly this: it had been created on
+  the server and separately committed upstream in 84a6845. The copies were identical.)
+- a **modified** tracked file. Print `git diff` for it and decide; do not discard it
+  blind.
+
+Then verify the pull took:
 
 ```bash
-cd $REPO && git status --short
+cd $REPO && ls waw_tace/ docs/ compare_registrtaion/failure_rates.py && grep -n "gradientConvergenceTolerance\|_deformable_dvf" registration/deformable_registration_v2.py
 ```
 
-```bash
-cd $REPO && git checkout -- registration/deformable_registration_v2.py
-```
+`gradientConvergenceTolerance=1e-12` and `_deformable_dvf.nii.gz` are the fixed values. If
+you see `1e-5` or `_deformable_field`, the fast-forward did not take and A6 is back to
+producing identity transforms.
 
-```bash
-cd $REPO && git fetch /path/to/multi-phase_registration.bundle main:refs/remotes/origin/main && git switch main && git merge --ff-only refs/remotes/origin/main
-```
+**Not the `data_reg_pipeline` directory.** `/media/external20/saeedeh_danaei/data_reg_pipeline`
+is a different, older lineage: on branch `master` (this repo has only `main` and
+`server-thesis-results`), with `check_z.ipynb` tracked, and with no `compare_registrtaion/`
+or `evaluate_pipeline/`. Pulling this repo into it would merge two unrelated histories.
+The clone to use is `sample_data_reg/multi-phase_registration`.
 
-Confirm the WAW-TACE files arrived and that the B-spline fixes are the ones on disk:
-
-```bash
-cd $REPO && ls waw_tace/ compare_registrtaion/run_waw_tace.sh compare_registrtaion/failure_rates.py && grep -n "gradientConvergenceTolerance\|_deformable_dvf" registration/deformable_registration_v2.py
-```
-
-`gradientConvergenceTolerance=1e-12` and `_deformable_dvf.nii.gz` are the fixed values; if
-you see `1e-5` or `_deformable_field`, the fast-forward did not take.
-
-Do **not** rsync the repo tree onto the server: the laptop's `deedsBCV` binaries are macOS
-arm64 and would clobber the Linux builds, and `--delete` would wipe server-only ignored
-files such as the uniGradICON weights.
+Do **not** rsync the repo tree onto the server: the laptop's `deedsBCV` binaries are
+macOS arm64 and would clobber the Linux builds, and `--delete` would wipe server-only
+ignored files such as the uniGradICON weights.
 
 ## 2b. Check the environment
 
@@ -117,106 +120,89 @@ df -h $DATA
 Need ~1 TB free at `$DATA` for the full cohort (§8 has the breakdown). If the disk is
 smaller, decide the cohort cut **now**, at §5, not halfway through §7.
 
-## 3. Gate check first — 20 MB, before the 48 GB
+## 3. Gate check first — 20 MB
 
 This decides whether the independent-label (tumour Dice) table is viable, which is the
 part that answers "your Dice is circular — the objective optimises the same masks you
-evaluate". Do not skip it to save an afternoon.
+evaluate". The scans are already on the server (§4) but **the tumour masks and metadata
+are not** — only the four `ct_scans_*.zip` were fetched. These two files are 20 MB.
 
-**Download where there is internet, not on the server** — it has none (§2). These two
-files are 20 MB, so run the `curl` on the laptop and move them across:
+The server reaches GitHub over its HTTPS proxy; whether it reaches Zenodo is a separate
+question, so test first:
 
 ```bash
-mkdir -p ~/Downloads/wawtace && cd ~/Downloads/wawtace
-curl -L -O "https://zenodo.org/records/12741586/files/ct_hcc_metadata_v2.csv?download=1"
-curl -L -O "https://zenodo.org/records/12741586/files/tumor_masks_wawtace_v1_08_05_2024.zip?download=1"
+curl -sI -o /dev/null -w '%{http_code}\n' "https://zenodo.org/records/12741586/files/ct_hcc_metadata_v2.csv?download=1"
 ```
 
-The gate check itself is pure Python over filenames, so it can run on the laptop too —
-that is the cheapest place to settle this decision. Substitute your own paths for
-`$DATA/raw` and `$DATA/tumor_masks` below if you do.
+`200` (or `302`) means fetch them directly on the server:
 
 ```bash
-cd $DATA/raw && mv 'ct_hcc_metadata_v2.csv?download=1' ct_hcc_metadata_v2.csv 2>/dev/null; mv 'tumor_masks_wawtace_v1_08_05_2024.zip?download=1' tumor_masks_wawtace_v1_08_05_2024.zip 2>/dev/null; ls -lh
+mkdir -p $DATA/raw && cd $DATA/raw && curl -L -o ct_hcc_metadata_v2.csv "https://zenodo.org/records/12741586/files/ct_hcc_metadata_v2.csv?download=1" && curl -L -o tumor_masks.zip "https://zenodo.org/records/12741586/files/tumor_masks_wawtace_v1_08_05_2024.zip?download=1" && ls -lh
+```
+
+Anything else (`000`, a proxy error) means the proxy covers github only — download those
+two on the laptop and move them across; they are small enough that any route works.
+
+```bash
+mkdir -p $DATA/tumor_masks && unzip -q -d $DATA/tumor_masks $DATA/raw/tumor_masks.zip && find $DATA/tumor_masks -type f | head
 ```
 
 ```bash
-mkdir -p $DATA/tumor_masks && unzip -q -d $DATA/tumor_masks $DATA/raw/tumor_masks_wawtace_v1_08_05_2024.zip && find $DATA/tumor_masks -type f | head
-```
-
-```bash
-cd $REPO && $PYTHON waw_tace/check_tumor_masks.py \
-    --masks    $DATA/tumor_masks \
-    --metadata $DATA/raw/ct_hcc_metadata_v2.csv \
-    --phases 0 1 2 \
-    --out      $DATA/tumor_eval_candidates.csv
+cd $REPO && $PYTHON waw_tace/check_tumor_masks.py --masks $DATA/tumor_masks --metadata $DATA/raw/ct_hcc_metadata_v2.csv --phases 0 1 2 --out $DATA/tumor_eval_candidates.csv
 ```
 
 Read the VERDICT line. It counts patients with a tumour mask in the **reference** phase
 *and* in at least one moving phase — the only ones from which a registration Dice is
 computable, because the masks were drawn on whichever phase showed the lesion best.
 
-- **≥ ~25 patients** → viable. Build `evaluate_pipeline/evaluate_tumor.py` (§7 of the
-  plan) and keep it in the paper as the independent ruler.
+- **≥ ~25 patients** → viable. Build `evaluate_pipeline/evaluate_tumor.py` (plan §4.4)
+  and keep it in the paper as the independent ruler.
 - **< 25** → demote to a qualitative figure and say so explicitly; the paper then rests
   on the front-end transfer table alone.
-- **0** → drop that deliverable. Still worth knowing before downloading 48 GB.
+- **0** → drop that deliverable, and state that it was checked.
 
-Also keep the printed metadata column list — it is the authoritative phase-availability
-source and should be cross-checked against what §5 discovers on disk.
+Keep the printed metadata column list — it is the authoritative phase-availability source
+and should be cross-checked against what §5 finds on disk.
 
-## 4. Download and extract the scans
+## 4. Extract the scans — already downloaded
 
-**This is the step with a real logistical problem, and it needs your decision.** The four
-scan archives are 48 GB; the server has no internet, and the laptop has ~23 GB free. So
-neither machine can do this alone on its own disk. Pick a route before starting:
-
-- an external drive on the laptop — download there, then transfer to the server;
-- a third machine with internet and disk that can reach the server;
-- a proxy or mirror on the server's network, if one exists for data (GitHub is blocked,
-  but your network may differ for other hosts — worth checking before assuming);
-- one archive at a time through the laptop: download, transfer, delete, repeat. Each part
-  is 10.4–13.5 GB, which fits in 23 GB one at a time.
-
-The last option needs no new hardware and is the fallback if nothing else is available.
-
-Wherever it runs, the download itself is:
+The four archives are **already on the server**, 44 GB total:
 
 ```bash
-cd $DATA/raw && for i in 1 2 3 4; do
-  curl -L -C - -O "https://zenodo.org/records/12741586/files/ct_scans_${i}_4_wawtace_09_05_24.zip?download=1"
-done
+ls -lh /media/external20/saeedeh_danaei/WAW-Tace/
 ```
 
-`-C -` resumes a partial transfer; re-run the loop if it drops. 48 GB total. Everything
-from §5 onward runs on the server, where the extracted `source/` lives.
+So there is nothing to download here and no laptop disk problem. Set `$DATA` in §1 to
+wherever you want the derived tree; the archives can stay where they are.
+
+The zips hold `.nii.gz` files, which are already compressed, so extraction is roughly
+1:1 — budget about another 44 GB. Check before starting:
 
 ```bash
-cd $DATA/raw && for f in ct_scans_*.zip*; do mv "$f" "${f%%\?*}"; done; ls -lh
+df -h /media/external20/saeedeh_danaei/
 ```
 
-Extract each part into **one shared `source/`** — the parts split patients, not
+Extract all four parts into **one shared `source/`** — the parts split patients, not
 directory levels:
 
 ```bash
-mkdir -p $DATA/source && for i in 1 2 3 4; do
-  unzip -q -n -d $DATA/source $DATA/raw/ct_scans_${i}_4_wawtace_09_05_24.zip
-done
+mkdir -p $DATA/source && for i in 1 2 3 4; do unzip -q -n -d $DATA/source /media/external20/saeedeh_danaei/WAW-Tace/ct_scans_${i}_4_wawtace_09_05_24.zip; done
 ```
 
 ```bash
-ls $DATA/source | head; echo "---"; ls $DATA/source | wc -l; du -sh $DATA/source
+ls $DATA/source | head && echo "---" && ls $DATA/source | wc -l && find $DATA/source -name "*_scan.nii.gz" | wc -l && du -sh $DATA/source
 ```
 
-Expect ~233 case folders. If the zips nest an extra level (e.g. `$DATA/source/ct_scans_1_4/24/`),
-flatten it so folders named by case id sit directly under `source/`, or point `--source`
-at the real parent in §5. Check with `find $DATA/source -name '*_scan.nii.gz' | head -3`.
-
-Once §5 succeeds, delete the zips to reclaim 48 GB:
+Expect ~233 case folders and roughly 650–800 `*_scan.nii.gz`. If the zips nest an extra
+level (e.g. `$DATA/source/ct_scans_1_4/24/`), flatten it so the case-id folders sit
+directly under `source/`, or point `--source` at the real parent in §5:
 
 ```bash
-rm -i $DATA/raw/ct_scans_*.zip
+find $DATA/source -name "*_scan.nii.gz" | head -3
 ```
+
+Keep the zips until §5 has run and its `cohort.csv` row count looks right — they are the
+only copy, and re-downloading needs a network route that may not be there.
 
 ## 5. Convert to a VinDr-shaped root
 
@@ -504,10 +490,9 @@ cd $REPO/compare_registrtaion && env -u MAIN_PATH STATE_FILE=.run_state bash che
 ## 10. Order of work
 
 1. §1 paths; §2 bundle the code to the server (no `git pull` there); §2b environment.
-2. §3 gate check — 20 MB, runnable on the laptop. **Settle the tumour-mask decision
-   before moving 48 GB anywhere.**
-3. §4 decide the download route (the server has no internet and the laptop has ~23 GB
-   free), then download and extract.
+2. §3 gate check — 20 MB (tumour masks + metadata; these were NOT in the earlier
+   download). **Settle the tumour-mask decision before the segmentation run.**
+3. §4 extract the scan archives already on the server.
 4. §5 convert, verify, **and decide the cohort size**.
 5. §6 segmentation (the GPU-bound stretch), split, alignment.
 6. §7 registration grid.
