@@ -236,6 +236,26 @@ int64, `labels_df[labels_df["StudyInstanceUID"] == study]` compares ints to `os.
 strings, matches nothing, and the whole run completes "successfully" having processed zero
 studies. The `waw%04d` scheme prevents it; the assertion proves it.
 
+### What the conversion found (2026-11-16)
+
+598 series converted, 0 failed. 200 studies usable of 233; 33 dropped, all but one for
+`no_reference_phase` (arterial + venous present, no non-contrast) plus `waw0378` with no
+scan files at all.
+
+Two cohort properties that must be reported, both different from VinDr:
+
+- **Within-study slice-thickness mismatch is the norm, not the exception**: 136 of 200
+  studies have phases differing by ≥2×, and non-contrast runs up to 7.5 mm. VinDr came
+  through the DICOM pipeline with consistent series; WAW-TACE is heterogeneous clinical
+  data where a thin arterial against a thick venous phase is routine practice. That makes
+  it a *harder* and more realistic test of the front-end — which strengthens the transfer
+  claim if it holds, but only if stated. **Stratify by the per-study max/min thickness
+  ratio**, not only the per-series thin/thick flag `cohort.csv` carries.
+- **One non-axial series**: `waw0540_p1` is LSP (coronal, 98 native slices at 3 mm)
+  against 597 LAS. Reorientation handled it correctly and it is in the right physical
+  space, but a study whose phases disagree in acquisition plane is an avoidable confound.
+  Excluded via `--exclude waw0540` in §6.
+
 **Decide the cohort size now.** A6 B-spline measured ~27 min/phase on VinDr, so ~200
 studies × ~2 moving phases ≈ 180 h single-threaded, and DEEDS/ANTs are the same order.
 If that does not fit the timeline, cut the **cohort**, not the conditions — rerun §5 with
@@ -245,100 +265,66 @@ p = 1.5e-6 on 53 test studies, so 60 has ample power for the front-end effect.
 
 ## 6. Segmentation, split, alignment
 
-TotalSegmentator over every standardised volume, then `combine_masks.py`:
+### Draw the evaluation sample FIRST
+
+Order matters here. Segmentation is the long pole, and everything downstream filters on
+`--split test`, so segmenting studies outside the sample buys nothing until the sample is
+widened. Drawing it first turns ~598 TotalSegmentator runs into ~120.
 
 ```bash
-cd $REPO/segmentation && cat > run_segmentation_waw.sh <<'EOF'
-#!/bin/bash
-set -e
-: "${MAIN_PATH:?set MAIN_PATH first}"
-export LOG_ROOT="${PIPELINE_LOG_ROOT:-pipeline_logs_waw}"
-mkdir -p "$LOG_ROOT"
-DATA_DIR="${MAIN_PATH}nifti_unprocessed_volumes"
-output_dir="${MAIN_PATH}ts_segmentations"
-mkdir -p "$output_dir"
-for vol in "$DATA_DIR"/*_standardized.nii.gz; do
-    file_name=$(basename "$vol" .nii.gz)
-    base_name="${file_name/_standardized/}"
-    IFS='_' read -r study_name vol_name _ <<< "$base_name"
-    prefix="${output_dir}/${study_name}_${vol_name}"
-    if [ -f "${prefix}_seg_reg.nii.gz" ]; then echo "SKIP $base_name"; continue; fi
-    seg_dir="${output_dir}/${study_name}_${vol_name}_segs"
-    mkdir -p "$seg_dir"
-    echo "── $base_name"
-    TotalSegmentator -i "$vol" -o "$seg_dir"
-    python3 combine_masks.py "$seg_dir" "$prefix" || echo "WARN combine_masks exit $? on $base_name"
-done
-EOF
-chmod +x run_segmentation_waw.sh
+cd $REPO && export MAIN_PATH=$DATA/derived/ && python3 compare_registrtaion/generate_split.py --sample 40 --sample_seed 7
 ```
 
-This is `run_segmentation.sh` with three changes: paths come from `MAIN_PATH`, it skips
-series already done (so it resumes), and it does not abort the loop when `combine_masks`
-exits non-zero — exit 2 means the sanity check found `seg_reg` too sparse, which is a
-per-series finding to count, not a reason to stop.
+Done on 2026-11-16 with seed 7: eligible pool 200 studies, 40 sampled, **79 moving pairs**
+(40 arterial, 39 venous). Comparable to VinDr's 53 test studies. Record the seed in the
+paper.
+
+### Segment the sampled studies
 
 ```bash
-cd $REPO/segmentation && tmux new-session -d -s wawseg './run_segmentation_waw.sh 2>&1 | tee seg_waw.log'
-tmux attach -t wawseg
-```
-
-~600 series. Budget by your per-volume TotalSegmentator time; this is the GPU-bound step.
-
-Afterwards, count the sanity failures — they are a reportable number, and the
-thick-slice series are where to expect them:
-
-```bash
-grep -c WARN $REPO/segmentation/seg_waw.log; ls $MAIN_PATH/ts_segmentations/*_seg_reg.nii.gz | wc -l
-```
-
-Split — WAW-TACE is **100% test**. Nothing is trained on it: VoxelMorph keeps its
-VinDr weights, because zero-shot transfer is the claim.
-
-Draw the **evaluation sample** here, with a recorded seed. Every runner and the
-evaluator filter on `--split test`, so marking exactly N studies as `test` is what makes
-all algorithms and all states land on the identical studies:
-
-```bash
-cd $REPO/compare_registrtaion && $PYTHON generate_split.py --sample 40 --sample_seed 7
-```
-
-Pick N from the compute budget in §5 — 40 studies × ~2 moving phases × ~27 min ≈ 36 h for
-A6, against ~180 h for the full ~200. It writes `splits/eval_sample.csv` recording the
-seed, N, the eligible pool and the drawn study IDs, so the sample is reproducible and
-reportable. Studies with no non-contrast phase are excluded from the draw, since without
-a fixed image there is nothing to register and sampling one would quietly shrink N.
-
-Sample **once, globally** — never per algorithm. Each condition reading the same split is
-what keeps the with/without-front-end comparison paired per (study, phase, organ), which
-is what `failure_rates.py` tests in §8. Per-algorithm samples would compare methods on
-different data and the paired tests would be meaningless.
-
-To use every eligible study instead, drop `--sample` and pass `--test_ratio 1.0`:
-
-```bash
-cd $REPO/compare_registrtaion && $PYTHON generate_split.py --test_ratio 1.0
-```
-
-Alignment — A2 (z-aligned) and A1 (crop-only baseline):
-
-```bash
-cd $REPO/alignment && $PYTHON align_and_crop.py --all --new-layout 2>&1 | tee align_waw.log
+cd $REPO/segmentation && export MAIN_PATH=$DATA/derived/ && bash run_segmentation_split.sh --split test --exclude waw0540 --dry-run
 ```
 
 ```bash
-cd $REPO/alignment && $PYTHON align_and_crop.py --all --new-layout --baseline 2>&1 | tee align_waw_baseline.log
+cd $REPO/segmentation && export MAIN_PATH=$DATA/derived/ && nohup bash run_segmentation_split.sh --split test --exclude waw0540 > $DATA/seg_waw.log 2>&1 & echo "started pid $!"
 ```
 
-Before the full `--all`, sanity-check one study — the flat-layout file discovery globs
-`*{study}*{series}*standardized.nii.gz`, and it must resolve to exactly one file:
+`run_segmentation_split.sh` takes its paths from `MAIN_PATH`, resumes (a series with a
+`_seg_reg.nii.gz` is skipped), and does **not** abort the loop when `combine_masks.py`
+exits 2 — that means the sanity check found `seg_reg` too sparse, which is a per-series
+finding to count, not a reason to stop the other 119. It prints the sparse and crashed
+lists at the end; both are reportable numbers, the sparse ones especially, since
+thick-slice series are where TotalSegmentator is expected to struggle.
+
+`--exclude waw0540` drops the one study with a non-axial series (§5).
 
 ```bash
-cd $REPO/alignment && $PYTHON align_and_crop.py waw0010 --new-layout
+tail -f $DATA/seg_waw.log
+```
+
+### Split-aware alignment
+
+```bash
+cd $REPO/alignment && export MAIN_PATH=$DATA/derived/ && python3 align_and_crop.py waw0002 --new-layout
+```
+
+Run that single study first: the flat-layout discovery globs
+`*{study}*{series}*standardized.nii.gz` and must resolve to exactly one file per call.
+The `waw%04d` / `p{n}` ID scheme is what makes that safe, and this is the cheapest place
+to confirm it.
+
+Then A2 (z-aligned) and A1 (crop-only):
+
+```bash
+cd $REPO/alignment && export MAIN_PATH=$DATA/derived/ && python3 align_and_crop.py --all --new-layout 2>&1 | tee $DATA/align_waw.log
 ```
 
 ```bash
-ls $MAIN_PATH/aligned_volumes | wc -l; ls $MAIN_PATH/baseline_volumes | wc -l
+cd $REPO/alignment && export MAIN_PATH=$DATA/derived/ && python3 align_and_crop.py --all --new-layout --baseline 2>&1 | tee $DATA/align_waw_baseline.log
+```
+
+```bash
+ls $DATA/derived/aligned_volumes | wc -l && ls $DATA/derived/baseline_volumes | wc -l
 ```
 
 ## 7. Registration grid
