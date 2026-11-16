@@ -8,8 +8,9 @@ The code the runbook calls is written: `waw_tace/prepare_waw_tace.py`,
 `waw_tace/check_tumor_masks.py`, `compare_registrtaion/run_waw_tace.sh`,
 `compare_registrtaion/failure_rates.py`, the `--sample` flag on
 `compare_registrtaion/generate_split.py`, and the `MAIN_PATH` env override in the four
-`configs.py` files (§4.1). Still to write, and only if the §3.1 gate check clears:
-`evaluate_pipeline/evaluate_tumor.py` (§4.4).
+`configs.py` files (§4.1). `evaluate_pipeline/evaluate_tumor.py` is **not** being written:
+the §3.1 gate check came back negative. The tier-3 organ evaluation in §3.1b replaces it
+and is a change to `evaluate_registration.ORGAN_LABELS`, not a new script.
 
 ## 0. Why this run exists
 
@@ -35,8 +36,11 @@ So the run has two deliverables, in priority order:
 2. **Independent-label table** — tumour Dice / tumour centroid error on the subset with
    tumour masks in two or more phases, as an objective-independent ruler.
 
-Deliverable 2 is what makes this a paper rather than a second appendix table. Confirm it
-is feasible before committing compute (§3, step 1).
+**Deliverable 2 was checked on 2026-11-16 and is not computable** — every WAW-TACE
+patient has tumour masks in exactly one phase, so no registration Dice can be formed from
+them (§3.1). Its purpose, answering the circularity objection, is served instead by
+evaluating tier-3 organs, which `seg_full` already carries and the objective never sees
+(§3.1b).
 
 ## 1. What the sample data actually is
 
@@ -126,13 +130,47 @@ So: `study_id = waw%04d`, `series_id = p{0..3}`. No underscores inside either to
 
 ## 3. Blocking decisions — settle these before any compute
 
-1. **Does the tumour-mask evaluation have enough cases?** Download
-   `ct_hcc_metadata_v2.csv` (16 kB) and `tumor_masks_wawtace_v1_08_05_2024.zip` (2.3 MB)
-   first and count patients with tumour masks in ≥2 phases, of which one is phase 0.
-   Masks were drawn on the phase where the lesion was most distinct, so single-phase
-   patients are useless for a registration Dice. If that count is under ~25, deliverable 2
-   degrades to a qualitative figure and the paper leans on deliverable 1 alone. **This is
-   a 20 MB download and an afternoon of counting — do it before the 48 GB.**
+1. **~~Does the tumour-mask evaluation have enough cases?~~ SETTLED 2026-11-16: NO.**
+   Ran `check_tumor_masks.py` on all 377 masks (233 patients). Masks per phase:
+   non-contrast 3, arterial 126, venous 74, delayed 30 — summing to 233, which is the
+   number of patients with any mask at all. **Every patient has masks in exactly one
+   phase**, so no pair of phases co-occurs for anyone. Qualifying patients: 0.
+
+   This is structural, not a sample-size problem: there is no pairing that rescues it,
+   not NC→arterial and not arterial→venous, because a registration Dice needs the lesion
+   outlined in both images being registered and that never happens here. The masks were
+   drawn once, on whichever phase showed the lesion best. Deliverable 2 is dropped —
+   state in the paper that it was checked and why it is not computable, rather than
+   leaving the reader to wonder why a dataset with tumour masks was not used for them.
+
+   The masks remain usable for qualitative figures (overlay a warped arterial tumour on
+   the NC phase) and the per-phase counts are worth reporting as cohort description.
+
+1b. **The circularity problem that deliverable 2 was for — solve it with tier-3 organs
+    instead.** The real objection is that the evaluation grades registration with the
+    same TotalSegmentator masks the rigid objective optimises. All 11 organs in
+    `evaluate_registration.ORGAN_LABELS` are in `seg_reg`, i.e. the objective sees every
+    one of them.
+
+    But `combine_masks.py` already splits the segmentation in two: `seg_reg` (71 organs,
+    tier 1–2, fed to the objective) and `seg_full` (adds 20 tier-3 organs — stomach,
+    esophagus, adrenal glands, urinary bladder, gluteal muscles, lung lobes — explicitly
+    marked "evaluation, not metric mask"). `seg_full` is written for every series and
+    **already warped alongside `seg_reg` by `register_fixed.py`**, so the independent
+    labels exist on every run already and are simply never scored.
+
+    Evaluating on tier-3 organs gives labels the registration objective never saw, on
+    both cohorts, with no new data. Best candidates for abdominal registration: stomach
+    (deformable, contrast-variable — a hard, fair test), esophagus, and the adrenal
+    glands (small but positionally stable). Skip lung lobes and gluteal muscles, which
+    sit at the crop boundary.
+
+    One honest caveat: `seg_full` also widens the crop bounding box, so tier-3 organs
+    are *not* independent of the **crop** front-end — only of the registration
+    objective. That is fine for the circularity charge, which is aimed at the organ
+    overlap term; and the crop claim is evidenced by failure-rate reduction in DEEDS /
+    ANTs / uniGradICON, whose objectives are intensity-based and see no mask at all.
+
 2. **Organ masks: re-run TotalSegmentator, or use the shipped ones?** The record ships
    1.0 GB of per-phase TotalSegmentator organ masks. Recommendation: **re-run TS on the
    standardised volumes**, as VinDr did. The shipped masks are in native anisotropic

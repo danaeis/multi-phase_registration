@@ -120,89 +120,60 @@ df -h $DATA
 Need ~1 TB free at `$DATA` for the full cohort (§8 has the breakdown). If the disk is
 smaller, decide the cohort cut **now**, at §5, not halfway through §7.
 
-## 3. Gate check first — 20 MB
+## 3. Gate check — DONE 2026-11-16, result negative
 
-This decides whether the independent-label (tumour Dice) table is viable, which is the
-part that answers "your Dice is circular — the objective optimises the same masks you
-evaluate". The scans are already on the server (§4) but **the tumour masks and metadata
-are not** — only the four `ct_scans_*.zip` were fetched. These two files are 20 MB.
+Ran, so do not repeat it. `check_tumor_masks.py` over all 377 masks (233 patients):
 
-The server reaches GitHub over its HTTPS proxy; whether it reaches Zenodo is a separate
-question, so test first:
+| phase | patients with a tumour mask |
+|---|---|
+| 0 non-contrast | 3 |
+| 1 arterial | 126 |
+| 2 venous | 74 |
+| 3 delayed | 30 |
 
-```bash
-curl -sI -o /dev/null -w '%{http_code}\n' "https://zenodo.org/records/12741586/files/ct_hcc_metadata_v2.csv?download=1"
-```
+Those sum to 233 — the total number of patients with any mask — so **every patient has
+masks in exactly one phase**. Qualifying patients (mask in the reference phase and in a
+moving phase): **0**. No pairing rescues it; a registration Dice needs the lesion drawn
+in both images being registered, and that never occurs in this dataset.
 
-`200` (or `302`) means fetch them directly on the server:
+The tumour-Dice deliverable is dropped. Say so explicitly in the paper, with these
+counts — a reader who knows WAW-TACE ships tumour masks will otherwise wonder why they
+went unused. The masks still serve for qualitative overlay figures.
 
-```bash
-mkdir -p $DATA/raw && cd $DATA/raw && curl -L -o ct_hcc_metadata_v2.csv "https://zenodo.org/records/12741586/files/ct_hcc_metadata_v2.csv?download=1" && curl -L -o tumor_masks.zip "https://zenodo.org/records/12741586/files/tumor_masks_wawtace_v1_08_05_2024.zip?download=1" && ls -lh
-```
+The circularity objection it was meant to answer is handled instead by evaluating
+**tier-3 organs** (plan §3.1b): `seg_full` already carries 20 organs the registration
+objective never sees, and `register_fixed.py` already warps it alongside `seg_reg`. That
+is a change to `evaluate_registration.ORGAN_LABELS`, not new data.
 
-Anything else (`000`, a proxy error) means the proxy covers github only — download those
-two on the laptop and move them across; they are small enough that any route works.
+Useful by-product — `ct_hcc_metadata_v2.csv` has 854 rows, one per scan, with columns
+`patient_id, ct_phase, ct_file_name, tumor_count, slice_thickness`. That matches the 854
+extracted scans exactly, and its `slice_thickness` is a cleaner source for the
+thickness stratification than re-deriving it from headers.
 
-```bash
-mkdir -p $DATA/tumor_masks && unzip -q -d $DATA/tumor_masks $DATA/raw/tumor_masks.zip && find $DATA/tumor_masks -type f | head
-```
+## 4. Extract the scans — DONE 2026-11-16
 
-```bash
-cd $REPO && $PYTHON waw_tace/check_tumor_masks.py --masks $DATA/tumor_masks --metadata $DATA/raw/ct_hcc_metadata_v2.csv --phases 0 1 2 --out $DATA/tumor_eval_candidates.csv
-```
-
-Read the VERDICT line. It counts patients with a tumour mask in the **reference** phase
-*and* in at least one moving phase — the only ones from which a registration Dice is
-computable, because the masks were drawn on whichever phase showed the lesion best.
-
-- **≥ ~25 patients** → viable. Build `evaluate_pipeline/evaluate_tumor.py` (plan §4.4)
-  and keep it in the paper as the independent ruler.
-- **< 25** → demote to a qualitative figure and say so explicitly; the paper then rests
-  on the front-end transfer table alone.
-- **0** → drop that deliverable, and state that it was checked.
-
-Keep the printed metadata column list — it is the authoritative phase-availability source
-and should be cross-checked against what §5 finds on disk.
-
-## 4. Extract the scans — already downloaded
-
-The four archives are **already on the server**, 44 GB total:
+The archives live read-only at `/media/external20/saeedeh_danaei/WAW-Tace/` (44 GB, four
+parts). They were extracted into the working tree with:
 
 ```bash
-ls -lh /media/external20/saeedeh_danaei/WAW-Tace/
+mkdir -p $DATA/source && for i in 1 2 3 4; do unzip -q -n -d $DATA/source $SCANS/ct_scans_${i}_4_wawtace_09_05_24.zip; done
 ```
 
-So there is nothing to download here and no laptop disk problem. Set `$DATA` in §1 to
-wherever you want the derived tree; the archives can stay where they are.
+Result: **233 case folders, 854 `*_scan.nii.gz`** — matching `ct_hcc_metadata_v2.csv`
+row for row. `unzip -d` only reads the archive, so the source directory being read-only
+does not matter.
 
-The zips hold `.nii.gz` files, which are already compressed, so extraction is roughly
-1:1 — budget about another 44 GB. Check before starting:
+Paths in use on the server:
 
-```bash
-df -h /media/external20/saeedeh_danaei/
+```
+REPO  = /media/external20/saeedeh_danaei/sample_data_reg/multi-phase_registration
+DATA  = /media/external20/saeedeh_danaei/sample_data_reg/ncct_cect/waw_tace
+SCANS = /media/external20/saeedeh_danaei/WAW-Tace          (read-only archives)
+MAIN_PATH = $DATA/derived/
 ```
 
-Extract all four parts into **one shared `source/`** — the parts split patients, not
-directory levels:
-
-```bash
-mkdir -p $DATA/source && for i in 1 2 3 4; do unzip -q -n -d $DATA/source /media/external20/saeedeh_danaei/WAW-Tace/ct_scans_${i}_4_wawtace_09_05_24.zip; done
-```
-
-```bash
-ls $DATA/source | head && echo "---" && ls $DATA/source | wc -l && find $DATA/source -name "*_scan.nii.gz" | wc -l && du -sh $DATA/source
-```
-
-Expect ~233 case folders and roughly 650–800 `*_scan.nii.gz`. If the zips nest an extra
-level (e.g. `$DATA/source/ct_scans_1_4/24/`), flatten it so the case-id folders sit
-directly under `source/`, or point `--source` at the real parent in §5:
-
-```bash
-find $DATA/source -name "*_scan.nii.gz" | head -3
-```
-
-Keep the zips until §5 has run and its `cohort.csv` row count looks right — they are the
-only copy, and re-downloading needs a network route that may not be there.
+`$DATA` sits beside `vindr_ds/`, which is the parallel layout the rest of this plan
+assumes. Disk at the time: 3.0 TB free of 21 TB.
 
 ## 5. Convert to a VinDr-shaped root
 
@@ -490,9 +461,9 @@ cd $REPO/compare_registrtaion && env -u MAIN_PATH STATE_FILE=.run_state bash che
 ## 10. Order of work
 
 1. §1 paths; §2 bundle the code to the server (no `git pull` there); §2b environment.
-2. §3 gate check — 20 MB (tumour masks + metadata; these were NOT in the earlier
-   download). **Settle the tumour-mask decision before the segmentation run.**
-3. §4 extract the scan archives already on the server.
+2. ~~§3 gate check~~ — done 2026-11-16, negative; the tumour-Dice deliverable is dropped
+   and replaced by the tier-3 organ evaluation (plan §3.1b).
+3. ~~§4 extract~~ — done 2026-11-16: 233 cases, 854 scans.
 4. §5 convert, verify, **and decide the cohort size**.
 5. §6 segmentation (the GPU-bound stretch), split, alignment.
 6. §7 registration grid.
