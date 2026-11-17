@@ -91,6 +91,63 @@ WATCH_TIMEOUT_MIN="${WATCH_TIMEOUT_MIN:-1200}"
 mkdir -p "$LOG_DIR"
 touch "$STATE_FILE"
 
+# ── Preflight: verify every engine BEFORE launching 7 parallel jobs ───────────
+# Each job shells out to a binary or imports a package. Without this, a missing
+# one fails all 79 pairs of that condition in turn and the failure surfaces
+# hours later as an empty results directory, mixed in with jobs that worked.
+# Checking costs a second. SKIP_PREFLIGHT=1 overrides for a deliberate
+# partial run.
+if [[ "${SKIP_PREFLIGHT:-0}" != "1" ]]; then
+    pf=0
+    echo "preflight:"
+
+    for v in DEEDS_BIN LINEAR_BIN APPLYFLOAT_BIN; do
+        b="${!v}"
+        if [[ -x "$b" ]]; then
+            echo "  ok    $v = $b"
+        else
+            echo "  FAIL  $v = $b  (missing or not executable)"
+            echo "        deedsBCV is a git submodule and must be BUILT on this host:"
+            echo "            git submodule update --init compare_registrtaion/deedsBCV"
+            echo "        Linux builds are required — macOS arm64 binaries will not run."
+            pf=1
+        fi
+    done
+
+    if command -v antsRegistration >/dev/null 2>&1; then
+        echo "  ok    antsRegistration = $(command -v antsRegistration)"
+    else
+        echo "  FAIL  antsRegistration not on PATH (job_ants needs it)"
+        pf=1
+    fi
+
+    if $PYTHON -c "import unigradicon" >/dev/null 2>&1; then
+        echo "  ok    python can import unigradicon"
+    else
+        echo "  FAIL  $PYTHON cannot import unigradicon (job_unigradicon_io needs it)"
+        echo "        pip install unigradicon — and its weights are a server-only"
+        echo "        download, so check they are present too."
+        pf=1
+    fi
+
+    if $PYTHON -c "import SimpleITK, pandas, numpy, scipy" >/dev/null 2>&1; then
+        echo "  ok    python core (SimpleITK, pandas, numpy, scipy)"
+    else
+        echo "  FAIL  $PYTHON is missing one of SimpleITK/pandas/numpy/scipy"
+        echo "        A background shell does not inherit an interactive venv"
+        echo "        activation — source it inside the launched command."
+        pf=1
+    fi
+
+    if [[ $pf -ne 0 ]]; then
+        echo ""
+        echo "Refusing to start. Fix the above, or set SKIP_PREFLIGHT=1 to run"
+        echo "only the jobs whose engines are present. Nothing was written."
+        exit 2
+    fi
+    echo ""
+fi
+
 # ── helpers (identical to run_all_resume.sh) ──────────────────────────────────
 ts()       { date '+%Y-%m-%d %H:%M:%S'; }
 mark_done(){ echo "$1" >> "$STATE_FILE"; }
