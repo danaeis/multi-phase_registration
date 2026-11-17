@@ -286,8 +286,15 @@ cd $REPO/segmentation && export MAIN_PATH=$DATA/derived/ && bash run_segmentatio
 ```
 
 ```bash
-cd $REPO/segmentation && export MAIN_PATH=$DATA/derived/ && nohup bash run_segmentation_split.sh --split test --exclude waw0540 > $DATA/seg_waw.log 2>&1 & echo "started pid $!"
+cd $REPO/segmentation && nohup bash -c 'source /media/external20/saeedeh_danaei/ncct_env/bin/activate && export MAIN_PATH=$DATA/derived/ && bash run_segmentation_split.sh --split test --exclude waw0540' > $DATA/seg_waw.log 2>&1 & echo "started pid $!"
 ```
+
+The environment is a **venv**, and it must be activated *inside* the backgrounded
+command — a `nohup` shell does not inherit an interactive activation, so a prior
+`source .../activate` in your terminal does not reach it. Getting this wrong is how the
+first attempt failed: `TotalSegmentator` was absent, every series failed in turn, and the
+run ended seconds later with the whole work list in the crash list. The script now
+refuses to start in that state rather than proving it 120 times.
 
 `run_segmentation_split.sh` takes its paths from `MAIN_PATH`, resumes (a series with a
 `_seg_reg.nii.gz` is skipped), and does **not** abort the loop when `combine_masks.py`

@@ -106,11 +106,15 @@ preflight_fail=0
 
 if ! command -v TotalSegmentator >/dev/null 2>&1; then
     echo "ERROR: TotalSegmentator is not on PATH."
-    echo "  Activate the environment that provides it, e.g.:"
-    echo "      conda activate ncct_env"
-    echo "  and launch via that interpreter, e.g.:"
-    echo "      nohup conda run -n ncct_env bash run_segmentation_split.sh ... &"
-    echo "  (a nohup/background shell does NOT inherit an interactive activation)"
+    echo ""
+    echo "  A nohup/background shell does NOT inherit an interactive activation,"
+    echo "  so activate INSIDE the backgrounded command:"
+    echo ""
+    echo "      nohup bash -c 'source /path/to/venv/bin/activate && \\"
+    echo "            bash run_segmentation_split.sh --split test' > log 2>&1 &"
+    echo ""
+    echo "  On this project's server the venv is:"
+    echo "      source /media/external20/saeedeh_danaei/ncct_env/bin/activate"
     preflight_fail=1
 fi
 
