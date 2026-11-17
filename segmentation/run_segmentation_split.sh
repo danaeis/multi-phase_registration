@@ -97,6 +97,41 @@ is_excluded() {
     return 1
 }
 
+# ── Preflight: fail fast, loudly ──────────────────────────────────────────────
+# Without this, a missing TotalSegmentator (the usual cause: the conda env is
+# not active in a nohup shell) fails every single series in turn and the run
+# ends minutes later having "processed" the whole cohort into the crash list.
+# Better to refuse to start.
+preflight_fail=0
+
+if ! command -v TotalSegmentator >/dev/null 2>&1; then
+    echo "ERROR: TotalSegmentator is not on PATH."
+    echo "  Activate the environment that provides it, e.g.:"
+    echo "      conda activate ncct_env"
+    echo "  and launch via that interpreter, e.g.:"
+    echo "      nohup conda run -n ncct_env bash run_segmentation_split.sh ... &"
+    echo "  (a nohup/background shell does NOT inherit an interactive activation)"
+    preflight_fail=1
+fi
+
+if ! $PYTHON -c "import numpy, nibabel" >/dev/null 2>&1; then
+    echo "ERROR: $PYTHON cannot import numpy and nibabel, which combine_masks.py needs."
+    preflight_fail=1
+fi
+
+if [[ ! -f "$SCRIPT_DIR/combine_masks.py" ]]; then
+    echo "ERROR: combine_masks.py not found next to this script ($SCRIPT_DIR)."
+    preflight_fail=1
+fi
+
+if [[ $preflight_fail -ne 0 ]]; then
+    echo ""
+    echo "Refusing to start: fix the above, then re-run. Nothing was written."
+    exit 2
+fi
+
+echo "preflight ok: TotalSegmentator=$(command -v TotalSegmentator)"
+
 echo "======================================================================"
 echo "  MAIN_PATH : $MAIN_PATH"
 echo "  volumes   : $DATA_DIR"
@@ -156,6 +191,16 @@ for vol in "${TODO[@]}"; do
     if ! TotalSegmentator -i "$vol" -o "$seg_dir"; then
         echo "  TotalSegmentator FAILED on $base"
         CRASHED+=("$base (TotalSegmentator)")
+        # Three failures in the first three series is a systematic problem
+        # (environment, GPU, weights), not three unlucky volumes. Stop rather
+        # than burn the whole work list proving it.
+        if [[ $i -le 3 && ${#CRASHED[@]} -ge 3 ]]; then
+            echo ""
+            echo "ABORTING: the first 3 series all failed — this is systematic,"
+            echo "not data. Check the TotalSegmentator output above (GPU, model"
+            echo "weights, environment) before re-running."
+            exit 3
+        fi
         continue
     fi
 
